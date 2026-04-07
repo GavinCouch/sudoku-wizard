@@ -611,9 +611,9 @@ export default function SudokuWizard() {
                 </div>
               )}
 
-              <div className="rounded-[2rem] border border-[#d8c1ff]/14 bg-[#120d18] p-4 sm:p-5">
-                <div className="mx-auto aspect-square max-w-[760px] rounded-[1.4rem] bg-[linear-gradient(180deg,#2c2334_0%,#17121f_100%)] p-2 shadow-[0_24px_50px_rgba(8,10,12,0.38)]">
-                  <div className="grid h-full grid-cols-9 grid-rows-9 overflow-hidden rounded-[1rem] bg-[#483b57]">
+              <div className="min-w-0 overflow-hidden rounded-[2rem] border border-[#d8c1ff]/14 bg-[#120d18] p-3 sm:p-4">
+                <div className="mx-auto aspect-square w-full max-w-[720px] overflow-hidden rounded-[1.25rem] border border-[#483b57] bg-[#483b57] shadow-[0_24px_50px_rgba(8,10,12,0.38)]">
+                  <div className="grid h-full grid-cols-9 grid-rows-9 overflow-hidden bg-[#483b57]">
                     {board.map((row, r) =>
                       row.map((value, c) => {
                         const fixed = puzzleData.fixed[r][c];
@@ -681,35 +681,34 @@ export default function SudokuWizard() {
                           <MotionButton
                             key={key}
                             type="button"
-                            whileTap={{ scale: 0.985 }}
                             animate={
                               wrongPulse
-                                ? { x: [0, -5, 5, -4, 4, 0], scale: [1, 1.02, 1], transition: { duration: 0.34 } }
+                                ? { opacity: [1, 0.82, 1, 0.88, 1], transition: { duration: 0.34 } }
                                 : correctPulse
-                                  ? { scale: [1, 1.08, 1], transition: { duration: 0.3 } }
-                                  : { x: 0, scale: 1 }
+                                  ? { filter: ["brightness(1)", "brightness(1.22)", "brightness(1)"], transition: { duration: 0.3 } }
+                                  : { opacity: 1, filter: "brightness(1)" }
                             }
                             onClick={() => setSelected({ r, c })}
                             style={cellBorderStyle}
                             className={classNames(
-                              "relative flex aspect-square min-w-0 items-center justify-center border-solid text-[1.05rem] font-bold leading-none outline-none transition-[background-color,color,box-shadow] duration-150 sm:text-[1.65rem]",
+                              "relative flex aspect-square min-w-0 items-center justify-center overflow-hidden border-solid text-[1.05rem] font-bold leading-none outline-none transition-[background-color,color,box-shadow] duration-150 sm:text-[1.65rem]",
                               isSelected && "z-10"
                             )}
                           >
                             {correctPulse && (
                               <motion.span
                                 initial={{ opacity: 0.75, scale: 0.8 }}
-                                animate={{ opacity: 0, scale: 1.15 }}
+                                animate={{ opacity: 0, scale: 1 }}
                                 transition={{ duration: 0.45 }}
-                                className="absolute inset-[10%] rounded-[0.7rem] border border-[#b57cff]"
+                                className="pointer-events-none absolute inset-0 bg-[#bc6cff]/24 ring-2 ring-inset ring-[#d8a7ff]"
                               />
                             )}
                             {wrongPulse && (
                               <motion.span
-                                initial={{ opacity: 0.7, scale: 0.94 }}
-                                animate={{ opacity: 0, scale: 1.08 }}
+                                initial={{ opacity: 0.78, scale: 1 }}
+                                animate={{ opacity: 0, scale: 1 }}
                                 transition={{ duration: 0.32 }}
-                                className="absolute inset-[10%] rounded-[0.7rem] border-2 border-[#f35e92]"
+                                className="pointer-events-none absolute inset-0 bg-[#f35e92]/28 ring-2 ring-inset ring-[#ff8eb7]"
                               />
                             )}
 
