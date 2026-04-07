@@ -548,8 +548,43 @@ export default function SudokuWizard() {
                     puzzleData.fixed[selected.r][selected.c]
                   }
                 />
+                {!showResetConfirm && (
+                  <UtilityButton
+                    icon={<RotateCcw className="h-4 w-4" />}
+                    label="New board"
+                    onClick={() => setShowResetConfirm(true)}
+                    tone="warm"
+                  />
+                )}
               </div>
             </div>
+
+            {showResetConfirm && (
+              <div className="mt-5 rounded-[1.5rem] border border-[#f35e92]/25 bg-[#f35e92]/10 p-4 text-sm text-[#fde3ee]">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>Start a fresh {difficulty.toLowerCase()} board and clear the current progress?</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:w-[220px]">
+                    <button
+                      type="button"
+                      onClick={() => setShowResetConfirm(false)}
+                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 font-medium text-[#f6efff]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => loadFreshPuzzle()}
+                      className="rounded-xl bg-[linear-gradient(135deg,#ff8fe1_0%,#9c62ff_100%)] px-3 py-2 font-semibold text-[#1d0922]"
+                    >
+                      Confirm
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div
               className={classNames(
@@ -704,55 +739,6 @@ export default function SudokuWizard() {
                 </div>
               </div>
             </div>
-
-            <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
-              <div />
-
-              <div className="space-y-3">
-                <div className="rounded-[1.5rem] border border-white/8 bg-white/4 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a999be]">Current square</div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                    <InlineStat label="Selected" value={selectedLabel} />
-                    <InlineStat label="Mode" value={noteMode ? "Notes" : "Fill"} />
-                    <InlineStat label="Hints left" value={String(hintsRemaining)} />
-                    {settings.liveValidation && <InlineStat label="Mistakes" value={String(mistakeCount)} />}
-                  </div>
-                </div>
-
-                {!showResetConfirm ? (
-                  <UtilityButton
-                    icon={<RotateCcw className="h-4 w-4" />}
-                    label="New board"
-                    onClick={() => setShowResetConfirm(true)}
-                    tone="warm"
-                    fullWidth
-                  />
-                ) : (
-                  <div className="rounded-[1.5rem] border border-[#f35e92]/25 bg-[#f35e92]/10 p-4 text-sm text-[#fde3ee]">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <p>Start a fresh {difficulty.toLowerCase()} board and clear the current progress?</p>
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowResetConfirm(false)}
-                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 font-medium text-[#f6efff]"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => loadFreshPuzzle()}
-                        className="rounded-xl bg-[linear-gradient(135deg,#ff8fe1_0%,#9c62ff_100%)] px-3 py-2 font-semibold text-[#1d0922]"
-                      >
-                        Confirm
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
           </MotionSection>
 
           <MotionAside
@@ -764,6 +750,9 @@ export default function SudokuWizard() {
             <PanelCard icon={<Save className="h-5 w-5 text-[#f3a3eb]" />} title="Session">
               <div className="space-y-3">
                 <InlineStat label="Difficulty" value={difficulty} />
+                <InlineStat label="Selected" value={selectedLabel} />
+                <InlineStat label="Mode" value={noteMode ? "Notes" : "Fill"} />
+                <InlineStat label="Hints left" value={String(hintsRemaining)} />
                 <InlineStat label="Open cells" value={String(81 - filledCount)} />
                 <InlineStat label="Best time" value={bestTime ? formatTime(bestTime) : "--:--"} />
                 {settings.liveValidation && <InlineStat label="Mistakes" value={String(mistakeCount)} />}
