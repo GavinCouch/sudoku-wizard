@@ -509,7 +509,7 @@ export default function SudokuWizard() {
           </div>
         </MotionHeader>
 
-        <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+        <div className="mt-8 grid items-start gap-8 xl:grid-cols-[minmax(0,1.2fr)_360px]">
           <MotionSection
             initial={{ opacity: 0, y: 22 }}
             animate={{ opacity: 1, y: 0 }}
