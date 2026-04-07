@@ -54,8 +54,8 @@ const SETTINGS_LIST = [
   },
   {
     key: "liveValidation",
-    label: "Check entries",
-    description: "Mark wrong numbers immediately.",
+    label: "Show mistakes",
+    description: "Mark wrong numbers and show the mistake counter.",
   },
 ];
 
@@ -473,7 +473,7 @@ export default function SudokuWizard() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className={classNames("mt-6 grid gap-3 sm:grid-cols-2", settings.liveValidation ? "xl:grid-cols-5" : "xl:grid-cols-4")}>
             <MetricCard
               icon={<Grid3X3 className="h-4 w-4" />}
               label="Difficulty"
@@ -498,12 +498,14 @@ export default function SudokuWizard() {
               value={progressLabel}
               detail={`${81 - filledCount} open`}
             />
-            <MetricCard
-              icon={<AlertTriangle className="h-4 w-4" />}
-              label="Mistakes"
-              value={String(mistakeCount)}
-              detail={mistakeDetail}
-            />
+            {settings.liveValidation && (
+              <MetricCard
+                icon={<AlertTriangle className="h-4 w-4" />}
+                label="Mistakes"
+                value={String(mistakeCount)}
+                detail={mistakeDetail}
+              />
+            )}
           </div>
         </MotionHeader>
 
@@ -518,7 +520,7 @@ export default function SudokuWizard() {
               <div>
                 <h2 className="text-2xl text-[#fbf5ff] [font-family:var(--font-display)]">Board</h2>
                 <p className="mt-1 text-sm text-[#c8bdd6]">
-                  Click a square, use the keypad or keyboard, and tap <span className="font-semibold text-[#f3a3eb]">N</span> for notes.
+                  Click a square, use your keyboard, and tap <span className="font-semibold text-[#f3a3eb]">N</span> for notes.
                 </p>
               </div>
 
@@ -549,188 +551,162 @@ export default function SudokuWizard() {
               </div>
             </div>
 
-            <div className="mt-6 rounded-[2rem] border border-[#d8c1ff]/14 bg-[#120d18] p-4 sm:p-5">
-              <div className="mx-auto aspect-square max-w-[760px] rounded-[1.4rem] bg-[linear-gradient(180deg,#2c2334_0%,#17121f_100%)] p-2 shadow-[0_24px_50px_rgba(8,10,12,0.38)]">
-                <div className="grid h-full grid-cols-9 grid-rows-9 overflow-hidden rounded-[1rem] bg-[#483b57]">
-                  {board.map((row, r) =>
-                    row.map((value, c) => {
-                      const fixed = puzzleData.fixed[r][c];
-                      const isSelected = selected.r === r && selected.c === c;
-                      const sameRow = settings.focusAura && selected.r === r;
-                      const sameCol = settings.focusAura && selected.c === c;
-                      const sameBox =
-                        settings.focusAura &&
-                        selected.r !== null &&
-                        getBoxIndex(selected.r, selected.c) === getBoxIndex(r, c);
-                      const sameNumber = settings.focusAura && selectedValue && value !== 0 && value === selectedValue;
-                      const key = `${r}-${c}`;
-                      const feedbackType = feedbackCells[key];
-                      const correctPulse = feedbackType === "correct";
-                      const wrongPulse = feedbackType === "wrong";
-                      const wrong = settings.liveValidation && !fixed && value !== 0 && value !== puzzleData.solution[r][c];
-                      const noteValues = notes[r][c];
-                      let backgroundColor = fixed ? "#ece4f3" : "#faf4ff";
-                      let textColor = fixed ? "#211927" : "#6170ff";
-                      const shadowLayers = [];
+            <div
+              className={classNames(
+                "mt-6 grid gap-4 xl:items-start",
+                settings.remainingCounts ? "xl:grid-cols-[128px_minmax(0,1fr)]" : "xl:grid-cols-1"
+              )}
+            >
+              {settings.remainingCounts && (
+                <div className="rounded-[1.5rem] border border-white/8 bg-white/4 p-4 xl:sticky xl:top-6">
+                  <div className="mb-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a999be]">Remaining</div>
+                    <div className="mt-1 text-sm text-[#c8bdd6]">{completionPercent(filledCount)}% filled</div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-9 xl:grid-cols-1">
+                    {range9.map((digit) => (
+                      <CounterPill
+                        key={digit}
+                        digit={digit}
+                        remaining={remaining[digit]}
+                        selected={selectedValue === digit}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                      if (sameRow || sameCol) {
-                        backgroundColor = "#ddd5e6";
-                      }
+              <div className="rounded-[2rem] border border-[#d8c1ff]/14 bg-[#120d18] p-4 sm:p-5">
+                <div className="mx-auto aspect-square max-w-[760px] rounded-[1.4rem] bg-[linear-gradient(180deg,#2c2334_0%,#17121f_100%)] p-2 shadow-[0_24px_50px_rgba(8,10,12,0.38)]">
+                  <div className="grid h-full grid-cols-9 grid-rows-9 overflow-hidden rounded-[1rem] bg-[#483b57]">
+                    {board.map((row, r) =>
+                      row.map((value, c) => {
+                        const fixed = puzzleData.fixed[r][c];
+                        const isSelected = selected.r === r && selected.c === c;
+                        const sameRow = settings.focusAura && selected.r === r;
+                        const sameCol = settings.focusAura && selected.c === c;
+                        const sameBox =
+                          settings.focusAura &&
+                          selected.r !== null &&
+                          getBoxIndex(selected.r, selected.c) === getBoxIndex(r, c);
+                        const sameNumber = settings.focusAura && selectedValue && value !== 0 && value === selectedValue;
+                        const key = `${r}-${c}`;
+                        const feedbackType = feedbackCells[key];
+                        const correctPulse = feedbackType === "correct";
+                        const wrongPulse = feedbackType === "wrong";
+                        const wrong = settings.liveValidation && !fixed && value !== 0 && value !== puzzleData.solution[r][c];
+                        const noteValues = notes[r][c];
+                        let backgroundColor = fixed ? "#ece4f3" : "#faf4ff";
+                        let textColor = fixed ? "#211927" : "#6170ff";
+                        const shadowLayers = [];
 
-                      if (sameBox) {
-                        backgroundColor = "#cdc4d8";
-                      }
+                        if (sameRow || sameCol) {
+                          backgroundColor = "#ddd5e6";
+                        }
 
-                      if (sameNumber) {
-                        backgroundColor = "#f3b9fb";
-                        textColor = "#54205f";
-                        shadowLayers.push("inset 0 0 0 1px rgba(150,70,175,0.28)");
-                      }
+                        if (sameBox) {
+                          backgroundColor = "#cdc4d8";
+                        }
 
-                      if (correctPulse) {
-                        backgroundColor = "#ecd9ff";
-                        shadowLayers.push("inset 0 0 0 2px rgba(165,108,255,0.5)");
-                      }
+                        if (sameNumber) {
+                          backgroundColor = "#f3b9fb";
+                          textColor = "#54205f";
+                          shadowLayers.push("inset 0 0 0 1px rgba(150,70,175,0.28)");
+                        }
 
-                      if (wrong) {
-                        backgroundColor = "#f7d8e3";
-                        textColor = "#a53662";
-                        shadowLayers.push("inset 0 0 0 2px rgba(245,96,145,0.35)");
-                      }
+                        if (correctPulse) {
+                          backgroundColor = "#ecd9ff";
+                          shadowLayers.push("inset 0 0 0 2px rgba(165,108,255,0.5)");
+                        }
 
-                      if (isSelected) {
-                        shadowLayers.push("inset 0 0 0 2px rgba(242,124,225,0.88)");
-                      }
+                        if (wrong) {
+                          backgroundColor = "#f7d8e3";
+                          textColor = "#a53662";
+                          shadowLayers.push("inset 0 0 0 2px rgba(245,96,145,0.35)");
+                        }
 
-                      const cellBorderStyle = {
-                        borderStyle: "solid",
-                        borderColor: "#483b57",
-                        borderTopWidth: r % 3 === 0 ? 3 : 1,
-                        borderLeftWidth: c % 3 === 0 ? 3 : 1,
-                        borderRightWidth: c === 8 ? 3 : 0,
-                        borderBottomWidth: r === 8 ? 3 : 0,
-                        backgroundColor,
-                        color: textColor,
-                        boxShadow: shadowLayers.join(", "),
-                        zIndex: isSelected ? 1 : 0,
-                      };
+                        if (isSelected) {
+                          shadowLayers.push("inset 0 0 0 2px rgba(242,124,225,0.88)");
+                        }
 
-                      return (
-                        <MotionButton
-                          key={key}
-                          type="button"
-                          whileTap={{ scale: 0.985 }}
-                          animate={
-                            wrongPulse
-                              ? { x: [0, -5, 5, -4, 4, 0], scale: [1, 1.02, 1], transition: { duration: 0.34 } }
-                              : correctPulse
-                                ? { scale: [1, 1.08, 1], transition: { duration: 0.3 } }
-                                : { x: 0, scale: 1 }
-                          }
-                          onClick={() => setSelected({ r, c })}
-                          style={cellBorderStyle}
-                          className={classNames(
-                            "relative flex aspect-square min-w-0 items-center justify-center border-solid text-[1.05rem] font-bold leading-none outline-none transition-[background-color,color,box-shadow] duration-150 sm:text-[1.65rem]",
-                            isSelected && "z-10"
-                          )}
-                        >
-                          {correctPulse && (
-                            <motion.span
-                              initial={{ opacity: 0.75, scale: 0.8 }}
-                              animate={{ opacity: 0, scale: 1.15 }}
-                              transition={{ duration: 0.45 }}
-                              className="absolute inset-[10%] rounded-[0.7rem] border border-[#b57cff]"
-                            />
-                          )}
-                          {wrongPulse && (
-                            <motion.span
-                              initial={{ opacity: 0.7, scale: 0.94 }}
-                              animate={{ opacity: 0, scale: 1.08 }}
-                              transition={{ duration: 0.32 }}
-                              className="absolute inset-[10%] rounded-[0.7rem] border-2 border-[#f35e92]"
-                            />
-                          )}
+                        const cellBorderStyle = {
+                          borderStyle: "solid",
+                          borderColor: "#483b57",
+                          borderTopWidth: r % 3 === 0 ? 3 : 1,
+                          borderLeftWidth: c % 3 === 0 ? 3 : 1,
+                          borderRightWidth: c === 8 ? 3 : 0,
+                          borderBottomWidth: r === 8 ? 3 : 0,
+                          backgroundColor,
+                          color: textColor,
+                          boxShadow: shadowLayers.join(", "),
+                          zIndex: isSelected ? 1 : 0,
+                        };
 
-                          {value === 0 ? (
-                            noteValues.length > 0 ? (
-                              <span className="grid h-full w-full grid-cols-3 grid-rows-3 gap-0 p-1.5 text-[0.54rem] font-semibold leading-none text-[#7c6f8d] sm:text-[0.7rem]">
-                                {range9.map((digit) => (
-                                  <span
-                                    key={digit}
-                                    className="flex items-center justify-center"
-                                  >
-                                    {noteValues.includes(digit) ? digit : ""}
-                                  </span>
-                                ))}
+                        return (
+                          <MotionButton
+                            key={key}
+                            type="button"
+                            whileTap={{ scale: 0.985 }}
+                            animate={
+                              wrongPulse
+                                ? { x: [0, -5, 5, -4, 4, 0], scale: [1, 1.02, 1], transition: { duration: 0.34 } }
+                                : correctPulse
+                                  ? { scale: [1, 1.08, 1], transition: { duration: 0.3 } }
+                                  : { x: 0, scale: 1 }
+                            }
+                            onClick={() => setSelected({ r, c })}
+                            style={cellBorderStyle}
+                            className={classNames(
+                              "relative flex aspect-square min-w-0 items-center justify-center border-solid text-[1.05rem] font-bold leading-none outline-none transition-[background-color,color,box-shadow] duration-150 sm:text-[1.65rem]",
+                              isSelected && "z-10"
+                            )}
+                          >
+                            {correctPulse && (
+                              <motion.span
+                                initial={{ opacity: 0.75, scale: 0.8 }}
+                                animate={{ opacity: 0, scale: 1.15 }}
+                                transition={{ duration: 0.45 }}
+                                className="absolute inset-[10%] rounded-[0.7rem] border border-[#b57cff]"
+                              />
+                            )}
+                            {wrongPulse && (
+                              <motion.span
+                                initial={{ opacity: 0.7, scale: 0.94 }}
+                                animate={{ opacity: 0, scale: 1.08 }}
+                                transition={{ duration: 0.32 }}
+                                className="absolute inset-[10%] rounded-[0.7rem] border-2 border-[#f35e92]"
+                              />
+                            )}
+
+                            {value === 0 ? (
+                              noteValues.length > 0 ? (
+                                <span className="grid h-full w-full grid-cols-3 grid-rows-3 gap-0 p-1.5 text-[0.54rem] font-semibold leading-none text-[#7c6f8d] sm:text-[0.7rem]">
+                                  {range9.map((digit) => (
+                                    <span
+                                      key={digit}
+                                      className="flex items-center justify-center"
+                                    >
+                                      {noteValues.includes(digit) ? digit : ""}
+                                    </span>
+                                  ))}
+                                </span>
+                              ) : null
+                            ) : (
+                              <span className="font-bold drop-shadow-[0_1px_0_rgba(255,255,255,0.25)]">
+                                {value}
                               </span>
-                            ) : null
-                          ) : (
-                            <span className="font-bold drop-shadow-[0_1px_0_rgba(255,255,255,0.25)]">
-                              {value}
-                            </span>
-                          )}
-                        </MotionButton>
-                      );
-                    })
-                  )}
+                            )}
+                          </MotionButton>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="space-y-4">
-                {settings.remainingCounts && (
-                  <div className="rounded-[1.5rem] border border-white/8 bg-white/4 p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a999be]">Remaining</div>
-                        <div className="mt-1 text-sm text-[#c8bdd6]">Digits still left to place.</div>
-                      </div>
-                      <div className="rounded-full border border-white/10 bg-black/10 px-3 py-1 text-xs text-[#c8bdd6]">
-                        {completionPercent(filledCount)}% filled
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-9">
-                      {range9.map((digit) => (
-                        <CounterPill
-                          key={digit}
-                          digit={digit}
-                          remaining={remaining[digit]}
-                          selected={selectedValue === digit}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="rounded-[1.5rem] border border-white/8 bg-white/4 p-4">
-                  <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#a999be]">Keypad</div>
-                  <div className="grid grid-cols-5 gap-3 sm:grid-cols-10">
-                    {range9.map((digit) => (
-                      <button
-                        key={digit}
-                        type="button"
-                        onClick={() => setCellValue(digit)}
-                        className={classNames(
-                          "flex aspect-square min-w-0 items-center justify-center rounded-[1rem] border p-0 text-lg font-bold leading-none transition-all duration-200",
-                          noteMode
-                            ? "border-[#bc6cff]/30 bg-[#bc6cff]/14 text-[#f2d8ff] hover:bg-[#bc6cff]/20"
-                            : "border-white/10 bg-white/6 text-[#fff3ff] hover:border-[#f08be8]/25 hover:bg-white/10"
-                        )}
-                      >
-                        {digit}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={clearSelectedCell}
-                      className="flex aspect-square min-w-0 items-center justify-center rounded-[1rem] border border-white/10 bg-[#1e1825] p-0 text-[0.78rem] font-bold leading-none text-[#f2e7ff] transition-all duration-200 hover:bg-[#2b2235] sm:text-[0.86rem]"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <div />
 
               <div className="space-y-3">
                 <div className="rounded-[1.5rem] border border-white/8 bg-white/4 p-4">
@@ -739,7 +715,7 @@ export default function SudokuWizard() {
                     <InlineStat label="Selected" value={selectedLabel} />
                     <InlineStat label="Mode" value={noteMode ? "Notes" : "Fill"} />
                     <InlineStat label="Hints left" value={String(hintsRemaining)} />
-                    <InlineStat label="Mistakes" value={String(mistakeCount)} />
+                    {settings.liveValidation && <InlineStat label="Mistakes" value={String(mistakeCount)} />}
                   </div>
                 </div>
 
@@ -775,11 +751,6 @@ export default function SudokuWizard() {
                     </div>
                   </div>
                 )}
-
-                <div className="rounded-[1.5rem] border border-white/8 bg-white/4 p-4 text-sm leading-7 text-[#c8bdd6]">
-                  <div className="font-semibold text-[#f6efff]">Shortcuts</div>
-                  <div className="mt-1">1-9 place digits. Backspace clears. Arrow keys move. N toggles notes. H uses a hint.</div>
-                </div>
               </div>
             </div>
           </MotionSection>
@@ -795,7 +766,7 @@ export default function SudokuWizard() {
                 <InlineStat label="Difficulty" value={difficulty} />
                 <InlineStat label="Open cells" value={String(81 - filledCount)} />
                 <InlineStat label="Best time" value={bestTime ? formatTime(bestTime) : "--:--"} />
-                <InlineStat label="Mistakes" value={String(mistakeCount)} />
+                {settings.liveValidation && <InlineStat label="Mistakes" value={String(mistakeCount)} />}
               </div>
               <p className="mt-4 text-sm leading-6 text-[#c8bdd6]">
                 Settings and best times stay on this device.
