@@ -104,6 +104,74 @@ const AVATARS = [
 
 const DEFAULT_AVATAR_ID = AVATARS[0].id;
 
+const DARK_THEME = {
+  "--sw-panel": "rgba(15, 11, 22, 0.82)",
+  "--sw-panel-strong": "rgba(11, 7, 16, 0.94)",
+  "--sw-panel-soft": "rgba(255, 255, 255, 0.04)",
+  "--sw-panel-hover": "rgba(255, 255, 255, 0.08)",
+  "--sw-border": "rgba(255, 255, 255, 0.1)",
+  "--sw-border-soft": "rgba(255, 255, 255, 0.08)",
+  "--sw-title": "#fbf5ff",
+  "--sw-text": "#f6efff",
+  "--sw-muted": "#c8bdd6",
+  "--sw-muted-strong": "#a999be",
+  "--sw-complete-text": "#f4e3ff",
+  "--sw-shadow": "0 24px 90px rgba(0, 0, 0, 0.36)",
+  "--sw-shadow-tight": "0 16px 40px rgba(0, 0, 0, 0.28)",
+  "--sw-board-card": "#120d18",
+  "--sw-board-frame": "#483b57",
+};
+
+const LIGHT_THEME = {
+  "--sw-panel": "rgba(255, 250, 255, 0.78)",
+  "--sw-panel-strong": "rgba(255, 253, 255, 0.94)",
+  "--sw-panel-soft": "rgba(255, 255, 255, 0.62)",
+  "--sw-panel-hover": "rgba(247, 219, 255, 0.78)",
+  "--sw-border": "rgba(98, 55, 117, 0.18)",
+  "--sw-border-soft": "rgba(98, 55, 117, 0.12)",
+  "--sw-title": "#26142f",
+  "--sw-text": "#302139",
+  "--sw-muted": "#6d5d78",
+  "--sw-muted-strong": "#7c5d91",
+  "--sw-complete-text": "#5f2175",
+  "--sw-shadow": "0 28px 90px rgba(125, 79, 144, 0.2)",
+  "--sw-shadow-tight": "0 18px 45px rgba(124, 83, 150, 0.2)",
+  "--sw-board-card": "rgba(255, 250, 255, 0.76)",
+  "--sw-board-frame": "#6f5d7b",
+};
+
+const DARK_BOARD_COLORS = {
+  fixed: "#ece4f3",
+  open: "#faf4ff",
+  rowCol: "#c8bdd4",
+  box: "#b5a6c4",
+  match: "#f0a7f6",
+  userText: "#6170ff",
+  fixedText: "#211927",
+  matchText: "#4a1856",
+  border: "#483b57",
+  correct: "#ecd9ff",
+  wrong: "#f7d8e3",
+  wrongText: "#a53662",
+  noteText: "#7c6f8d",
+};
+
+const LIGHT_BOARD_COLORS = {
+  fixed: "#f1e8f8",
+  open: "#fff9ff",
+  rowCol: "#d5c2df",
+  box: "#c1a8d0",
+  match: "#ee9bef",
+  userText: "#3344c9",
+  fixedText: "#271b2e",
+  matchText: "#4a164e",
+  border: "#655272",
+  correct: "#e8d5ff",
+  wrong: "#f8d2e0",
+  wrongText: "#a02d58",
+  noteText: "#7d6688",
+};
+
 const range9 = Array.from({ length: 9 }, (_, index) => index + 1);
 
 function shuffle(arr) {
@@ -396,6 +464,15 @@ export default function SudokuWizard() {
   const activeAvatar = AVATARS.find((avatar) => avatar.id === profile.avatarId) ?? AVATARS[0];
   const ActiveAvatarIcon = activeAvatar.icon;
   const timerIsRunning = settings.timerEnabled && !timerLocked && !completed;
+  const themeVars = settings.lightMode ? LIGHT_THEME : DARK_THEME;
+  const boardColors = settings.lightMode ? LIGHT_BOARD_COLORS : DARK_BOARD_COLORS;
+  const pageStyle = {
+    ...themeVars,
+    background: settings.lightMode
+      ? "radial-gradient(circle at 12% -10%, rgba(255, 147, 228, 0.52) 0%, transparent 34%), radial-gradient(circle at 88% 8%, rgba(156, 98, 255, 0.34) 0%, transparent 32%), linear-gradient(135deg, #fff6fd 0%, #eee8f5 48%, #d6d1dc 100%)"
+      : "radial-gradient(circle at top left, #3a1245 0%, #17081f 45%, #050507 100%)",
+    color: "var(--sw-text)",
+  };
 
   useEffect(() => {
     if (!timerIsRunning) return undefined;
@@ -929,32 +1006,31 @@ export default function SudokuWizard() {
 
   return (
     <div
-      className={classNames(
-        "min-h-screen overflow-hidden",
-        settings.lightMode
-          ? "bg-[radial-gradient(circle_at_top_left,#ffe6f8_0%,#f0e9ff_44%,#d7d3dc_100%)] text-[#211927]"
-          : "bg-[radial-gradient(circle_at_top_left,#3a1245_0%,#17081f_45%,#050507_100%)] text-[#f6efff]"
-      )}
+      style={pageStyle}
+      className="min-h-screen overflow-hidden transition-colors duration-500"
     >
-      <div className="pointer-events-none absolute inset-0 opacity-70">
-        <div className="absolute -left-12 top-0 h-72 w-72 rounded-full bg-[#ff74d9]/18 blur-3xl" />
-        <div className="absolute right-0 top-40 h-80 w-80 rounded-full bg-[#8d5bff]/16 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-[#9590a8]/10 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 opacity-80">
+        <div className="absolute -left-12 top-0 h-72 w-72 rounded-full bg-[#ff74d9]/22 blur-3xl" />
+        <div className="absolute right-0 top-40 h-80 w-80 rounded-full bg-[#8d5bff]/18 blur-3xl" />
+        <div className={classNames("absolute bottom-0 left-1/3 h-72 w-72 rounded-full blur-3xl", settings.lightMode ? "bg-[#2b2433]/10" : "bg-[#9590a8]/10")} />
+        {settings.lightMode && (
+          <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.65)_0%,transparent_100%)]" />
+        )}
       </div>
 
       <div className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <MotionHeader
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-[2rem] border border-white/8 bg-[#0f0b16]/82 p-6 shadow-[0_24px_90px_rgba(0,0,0,0.36)] backdrop-blur-xl"
+          className="rounded-[2rem] border border-[var(--sw-border)] bg-[var(--sw-panel)] p-6 shadow-[var(--sw-shadow)] backdrop-blur-xl"
         >
           <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-center gap-4">
-              <div className="rounded-[1.6rem] border border-white/10 bg-black/25 p-2 shadow-[0_16px_40px_rgba(0,0,0,0.28)]">
+              <div className="rounded-[1.6rem] border border-[var(--sw-border)] bg-[var(--sw-panel-soft)] p-2 shadow-[var(--sw-shadow-tight)]">
                 <img src={wizardLogo} alt="Sudoku Wizard logo" className="h-20 w-auto sm:h-24" />
               </div>
               <div>
-                <h1 className="text-4xl tracking-tight text-[#fbf5ff] sm:text-5xl [font-family:var(--font-display)]">
+                <h1 className="text-4xl tracking-tight text-[var(--sw-title)] sm:text-5xl [font-family:var(--font-display)]">
                   Sudoku Wizard
                 </h1>
               </div>
@@ -964,13 +1040,13 @@ export default function SudokuWizard() {
               <button
                 type="button"
                 onClick={() => setProfileOpen(true)}
-                className="inline-flex items-center gap-3 self-start rounded-full border border-white/10 bg-black/20 p-2 pr-4 text-sm font-semibold text-[#f6efff] transition-all duration-200 hover:border-[#f08be8]/30 hover:bg-white/8 xl:self-end"
+                className="inline-flex items-center gap-3 self-start rounded-full border border-[var(--sw-border)] bg-[var(--sw-panel-soft)] p-2 pr-4 text-sm font-semibold text-[var(--sw-title)] shadow-[var(--sw-shadow-tight)] transition-all duration-200 hover:border-[#f08be8]/35 hover:bg-[var(--sw-panel-hover)] xl:self-end"
               >
                 <span className={classNames("flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br", activeAvatar.gradient)}>
                   <ActiveAvatarIcon className="h-6 w-6 text-white" />
                 </span>
                 <span>{isSignedIn ? "Profile" : "Guest"}</span>
-                <ChevronDown className="h-4 w-4 text-[#c8bdd6]" />
+                <ChevronDown className="h-4 w-4 text-[var(--sw-muted)]" />
               </button>
 
               <div className="flex flex-wrap gap-2 xl:justify-end">
@@ -983,11 +1059,11 @@ export default function SudokuWizard() {
                       "rounded-full border px-4 py-2.5 text-left transition-all duration-200",
                       difficulty === level
                         ? "border-[#ff93e4]/40 bg-[linear-gradient(135deg,#ff8fe1_0%,#9c62ff_100%)] text-[#1d0922] shadow-[0_12px_30px_rgba(188,98,255,0.28)]"
-                        : "border-white/10 bg-white/5 text-[#efe5ff] hover:border-[#be86ff]/25 hover:bg-white/8"
+                        : "border-[var(--sw-border)] bg-[var(--sw-panel-soft)] text-[var(--sw-text)] hover:border-[#be86ff]/35 hover:bg-[var(--sw-panel-hover)]"
                     )}
                   >
                     <div className="text-sm font-semibold">{level}</div>
-                    <div className={classNames("text-xs", difficulty === level ? "text-[#3c1644]" : "text-[#aea1bf]")}>
+                    <div className={classNames("text-xs", difficulty === level ? "text-[#3c1644]" : "text-[var(--sw-muted)]")}>
                       {info.clues} clues
                     </div>
                   </button>
@@ -1031,12 +1107,12 @@ export default function SudokuWizard() {
             initial={{ opacity: 0, y: 22 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.04 }}
-            className="rounded-[2rem] border border-white/8 bg-[#0f0b16]/80 p-4 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-xl sm:p-6"
+            className="rounded-[2rem] border border-[var(--sw-border)] bg-[var(--sw-panel)] p-4 shadow-[var(--sw-shadow)] backdrop-blur-xl sm:p-6"
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h2 className="text-2xl text-[#fbf5ff] [font-family:var(--font-display)]">Board</h2>
-                <p className="mt-1 text-sm text-[#c8bdd6]">
+                <h2 className="text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">Board</h2>
+                <p className="mt-1 text-sm text-[var(--sw-muted)]">
                   Click a square, use your keyboard, and tap <span className="font-semibold text-[#f3a3eb]">N</span> for notes.
                 </p>
               </div>
@@ -1085,7 +1161,7 @@ export default function SudokuWizard() {
             </div>
 
             {showResetConfirm && (
-              <div className="mt-5 rounded-[1.5rem] border border-[#f35e92]/25 bg-[#f35e92]/10 p-4 text-sm text-[#fde3ee]">
+              <div className="mt-5 rounded-[1.5rem] border border-[#f35e92]/25 bg-[#f35e92]/10 p-4 text-sm text-[var(--sw-text)]">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1095,7 +1171,7 @@ export default function SudokuWizard() {
                     <button
                       type="button"
                       onClick={() => setShowResetConfirm(false)}
-                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 font-medium text-[#f6efff]"
+                      className="rounded-xl border border-[var(--sw-border)] bg-[var(--sw-panel-soft)] px-3 py-2 font-medium text-[var(--sw-text)]"
                     >
                       Cancel
                     </button>
@@ -1118,10 +1194,10 @@ export default function SudokuWizard() {
               )}
             >
               {settings.remainingCounts && (
-                <div className="rounded-[1.5rem] border border-white/8 bg-white/4 p-4 xl:sticky xl:top-6">
+                <div className="rounded-[1.5rem] border border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] p-4 xl:sticky xl:top-6">
                   <div className="mb-3">
-                    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a999be]">Remaining</div>
-                    <div className="mt-1 text-sm text-[#c8bdd6]">{completionPercent(filledCount)}% filled</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--sw-muted-strong)]">Remaining</div>
+                    <div className="mt-1 text-sm text-[var(--sw-muted)]">{completionPercent(filledCount)}% filled</div>
                   </div>
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-9 xl:grid-cols-1">
                     {range9.map((digit) => (
@@ -1136,9 +1212,9 @@ export default function SudokuWizard() {
                 </div>
               )}
 
-              <div className="min-w-0 overflow-hidden rounded-[2rem] border border-[#d8c1ff]/14 bg-[#120d18] p-3 sm:p-4">
-                <div className="mx-auto aspect-square w-full max-w-[720px] overflow-hidden rounded-[1.25rem] border border-[#483b57] bg-[#483b57] shadow-[0_24px_50px_rgba(8,10,12,0.38)]">
-                  <div className="grid h-full grid-cols-9 grid-rows-9 overflow-hidden bg-[#483b57]">
+              <div className="min-w-0 overflow-hidden rounded-[2rem] border border-[var(--sw-border)] bg-[var(--sw-board-card)] p-3 shadow-[var(--sw-shadow-tight)] sm:p-4">
+                <div className="mx-auto aspect-square w-full max-w-[720px] overflow-hidden rounded-[1.25rem] border border-[var(--sw-board-frame)] bg-[var(--sw-board-frame)] shadow-[0_24px_50px_rgba(8,10,12,0.24)]">
+                  <div className="grid h-full grid-cols-9 grid-rows-9 overflow-hidden bg-[var(--sw-board-frame)]">
                     {board.map((row, r) =>
                       row.map((value, c) => {
                         const fixed = puzzleData.fixed[r][c];
@@ -1156,32 +1232,32 @@ export default function SudokuWizard() {
                         const wrongPulse = feedbackType === "wrong";
                         const wrong = settings.liveValidation && !fixed && value !== 0 && value !== puzzleData.solution[r][c];
                         const noteValues = notes[r][c];
-                        let backgroundColor = fixed ? "#ece4f3" : "#faf4ff";
-                        let textColor = fixed ? "#211927" : "#6170ff";
+                        let backgroundColor = fixed ? boardColors.fixed : boardColors.open;
+                        let textColor = fixed ? boardColors.fixedText : boardColors.userText;
                         const shadowLayers = [];
 
                         if (sameRow || sameCol) {
-                          backgroundColor = "#ddd5e6";
+                          backgroundColor = boardColors.rowCol;
                         }
 
                         if (sameBox) {
-                          backgroundColor = "#cdc4d8";
+                          backgroundColor = boardColors.box;
                         }
 
                         if (sameNumber) {
-                          backgroundColor = "#f3b9fb";
-                          textColor = "#54205f";
+                          backgroundColor = boardColors.match;
+                          textColor = boardColors.matchText;
                           shadowLayers.push("inset 0 0 0 1px rgba(150,70,175,0.28)");
                         }
 
                         if (correctPulse) {
-                          backgroundColor = "#ecd9ff";
+                          backgroundColor = boardColors.correct;
                           shadowLayers.push("inset 0 0 0 2px rgba(165,108,255,0.5)");
                         }
 
                         if (wrong) {
-                          backgroundColor = "#f7d8e3";
-                          textColor = "#a53662";
+                          backgroundColor = boardColors.wrong;
+                          textColor = boardColors.wrongText;
                           shadowLayers.push("inset 0 0 0 2px rgba(245,96,145,0.35)");
                         }
 
@@ -1191,7 +1267,7 @@ export default function SudokuWizard() {
 
                         const cellBorderStyle = {
                           borderStyle: "solid",
-                          borderColor: "#483b57",
+                          borderColor: boardColors.border,
                           borderTopWidth: r % 3 === 0 ? 3 : 1,
                           borderLeftWidth: c % 3 === 0 ? 3 : 1,
                           borderRightWidth: c === 8 ? 3 : 0,
@@ -1239,7 +1315,7 @@ export default function SudokuWizard() {
 
                             {value === 0 ? (
                               noteValues.length > 0 ? (
-                                <span className="grid h-full w-full grid-cols-3 grid-rows-3 gap-0 p-1.5 text-[0.54rem] font-semibold leading-none text-[#7c6f8d] sm:text-[0.7rem]">
+                                <span className="grid h-full w-full grid-cols-3 grid-rows-3 gap-0 p-1.5 text-[0.54rem] font-semibold leading-none sm:text-[0.7rem]" style={{ color: boardColors.noteText }}>
                                   {range9.map((digit) => (
                                     <span
                                       key={digit}
@@ -1280,7 +1356,7 @@ export default function SudokuWizard() {
                 <InlineStat label="Open cells" value={String(81 - filledCount)} />
                 {settings.liveValidation && <InlineStat label="Mistakes" value={String(mistakeCount)} />}
               </div>
-              <p className="mt-4 text-sm leading-6 text-[#c8bdd6]">
+              <p className="mt-4 text-sm leading-6 text-[var(--sw-muted)]">
                 Scores, archives, and settings are tucked into your profile.
               </p>
             </PanelCard>
@@ -1291,13 +1367,13 @@ export default function SudokuWizard() {
                   initial={{ opacity: 0, y: 14, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.99 }}
-                  className="rounded-[2rem] border border-[#bc6cff]/25 bg-[#bc6cff]/12 p-6 shadow-[0_24px_90px_rgba(0,0,0,0.25)]"
+                  className="rounded-[2rem] border border-[#bc6cff]/25 bg-[#bc6cff]/12 p-6 shadow-[var(--sw-shadow-tight)]"
                 >
                   <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-6 w-6 text-[#efdcff]" />
-                    <h2 className="text-2xl text-[#f8eeff] [font-family:var(--font-display)]">Solved</h2>
+                    <CheckCircle2 className="h-6 w-6 text-[#bc6cff]" />
+                    <h2 className="text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">Solved</h2>
                   </div>
-                  <p className="mt-3 text-sm leading-7 text-[#ead7ff]">{winMessage}</p>
+                  <p className="mt-3 text-sm leading-7 text-[var(--sw-muted)]">{winMessage}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1558,7 +1634,7 @@ function ProfileDrawer({
             animate={{ x: 0 }}
             exit={{ x: 420 }}
             transition={{ type: "spring", damping: 28, stiffness: 230 }}
-            className="absolute right-0 top-0 flex h-full w-full max-w-[430px] flex-col border-l border-white/10 bg-[#0b0710] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.5)]"
+            className="absolute right-0 top-0 flex h-full w-full max-w-[430px] flex-col border-l border-[var(--sw-border)] bg-[var(--sw-panel-strong)] p-5 shadow-[var(--sw-shadow)] backdrop-blur-2xl"
           >
             <div className="flex items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
@@ -1566,28 +1642,28 @@ function ProfileDrawer({
                   <ActiveAvatarIcon className="h-7 w-7 text-white" />
                 </span>
                 <div className="min-w-0">
-                  <div className="text-2xl text-[#fbf5ff] [font-family:var(--font-display)]">
+                  <div className="text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">
                     {isSignedIn ? "Profile" : "Guest"}
                   </div>
-                  <div className="truncate text-sm text-[#c8bdd6]">{email}</div>
+                  <div className="truncate text-sm text-[var(--sw-muted)]">{email}</div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-full border border-white/10 bg-white/5 p-2 text-[#f6efff] hover:bg-white/10"
+                className="rounded-full border border-[var(--sw-border)] bg-[var(--sw-panel-soft)] p-2 text-[var(--sw-text)] hover:bg-[var(--sw-panel-hover)]"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="mt-5 grid grid-cols-3 gap-2 rounded-full border border-white/8 bg-white/5 p-1">
+            <div className="mt-5 grid grid-cols-3 gap-2 rounded-full border border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] p-1">
               {tabs.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setTab(item.id)}
-                  className={classNames("rounded-full px-3 py-2 text-sm font-semibold", tab === item.id ? "bg-[#bc6cff] text-[#19091e]" : "text-[#d9cce8]")}
+                  className={classNames("rounded-full px-3 py-2 text-sm font-semibold", tab === item.id ? "bg-[#bc6cff] text-[#19091e]" : "text-[var(--sw-muted)]")}
                 >
                   {item.label}
                 </button>
@@ -1595,7 +1671,7 @@ function ProfileDrawer({
             </div>
 
             {accountMessage && (
-              <div className="mt-4 rounded-[1rem] border border-[#f08be8]/20 bg-[#f08be8]/10 px-4 py-3 text-sm text-[#ffd7fb]">
+              <div className="mt-4 rounded-[1rem] border border-[#f08be8]/25 bg-[#f08be8]/12 px-4 py-3 text-sm text-[var(--sw-text)]">
                 {accountMessage}
               </div>
             )}
@@ -1625,7 +1701,7 @@ function ProfileDrawer({
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm leading-6 text-[#c8bdd6]">Guest games do not save scores. Sign in if you want best times and completed boards to follow you.</p>
+                      <p className="text-sm leading-6 text-[var(--sw-muted)]">Guest games do not save scores. Sign in if you want best times and completed boards to follow you.</p>
                     )}
                   </ProfilePanel>
                 </div>
@@ -1634,19 +1710,19 @@ function ProfileDrawer({
               {tab === "archives" && (
                 <ProfilePanel icon={<Archive className="h-5 w-5 text-[#f3a3eb]" />} title={`Archive ${archives.length}/${MAX_ARCHIVES}`}>
                   {!isSignedIn ? (
-                    <p className="text-sm leading-6 text-[#c8bdd6]">Archives are available after signing in.</p>
+                    <p className="text-sm leading-6 text-[var(--sw-muted)]">Archives are available after signing in.</p>
                   ) : !profileLoaded ? (
-                    <p className="text-sm leading-6 text-[#c8bdd6]">Loading archives...</p>
+                    <p className="text-sm leading-6 text-[var(--sw-muted)]">Loading archives...</p>
                   ) : archives.length === 0 ? (
-                    <p className="text-sm leading-6 text-[#c8bdd6]">No archived puzzles yet.</p>
+                    <p className="text-sm leading-6 text-[var(--sw-muted)]">No archived puzzles yet.</p>
                   ) : (
                     <div className="space-y-3">
                       {archives.map((archive) => (
-                        <div key={archive.id} className="rounded-[1.3rem] border border-white/8 bg-white/4 p-4">
+                        <div key={archive.id} className="rounded-[1.3rem] border border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <div className="font-semibold text-[#f6efff]">{archive.name}</div>
-                              <div className="mt-1 text-sm text-[#c8bdd6]">
+                              <div className="font-semibold text-[var(--sw-title)]">{archive.name}</div>
+                              <div className="mt-1 text-sm text-[var(--sw-muted)]">
                                 {archive.difficulty} - {formatTime(archive.seconds ?? 0)} saved
                               </div>
                             </div>
@@ -1696,7 +1772,7 @@ function ProfileDrawer({
               )}
             </div>
 
-            <div className="mt-5 border-t border-white/8 pt-4">
+            <div className="mt-5 border-t border-[var(--sw-border-soft)] pt-4">
               {isSignedIn ? (
                 <UtilityButton icon={<LogOut className="h-4 w-4" />} label="Logout" onClick={onLogout} fullWidth />
               ) : (
@@ -1712,10 +1788,10 @@ function ProfileDrawer({
 
 function ProfilePanel({ icon, title, children }) {
   return (
-    <div className="rounded-[1.7rem] border border-white/8 bg-white/4 p-5">
+    <div className="rounded-[1.7rem] border border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] p-5">
       <div className="mb-4 flex items-center gap-3">
         {icon}
-        <h3 className="text-2xl text-[#fbf5ff] [font-family:var(--font-display)]">{title}</h3>
+        <h3 className="text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">{title}</h3>
       </div>
       {children}
     </div>
@@ -1731,36 +1807,36 @@ function AvatarChoice({ avatar, selected, onClick }) {
       onClick={onClick}
       className={classNames(
         "rounded-[1.2rem] border p-3 text-center transition-all duration-200",
-        selected ? "border-[#f08be8]/55 bg-[#f08be8]/14" : "border-white/8 bg-white/4 hover:bg-white/8"
+        selected ? "border-[#f08be8]/55 bg-[#f08be8]/14" : "border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] hover:bg-[var(--sw-panel-hover)]"
       )}
     >
       <span className={classNames("mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br", avatar.gradient)}>
         <AvatarIcon className="h-6 w-6 text-white" />
       </span>
-      <span className="mt-2 block text-xs font-semibold text-[#f6efff]">{avatar.label}</span>
+      <span className="mt-2 block text-xs font-semibold text-[var(--sw-title)]">{avatar.label}</span>
     </button>
   );
 }
 
 function MetricCard({ icon, label, value, detail }) {
   return (
-    <div className="rounded-[1.4rem] border border-white/8 bg-white/4 p-4">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#b59dcc]">
+    <div className="rounded-[1.4rem] border border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sw-muted-strong)]">
         {icon}
         {label}
       </div>
-      <div className="mt-3 text-2xl text-[#fbf5ff] [font-family:var(--font-display)]">{value}</div>
-      <div className="mt-1 text-sm text-[#c8bdd6]">{detail}</div>
+      <div className="mt-3 text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">{value}</div>
+      <div className="mt-1 text-sm text-[var(--sw-muted)]">{detail}</div>
     </div>
   );
 }
 
 function PanelCard({ icon, title, children }) {
   return (
-    <div className="rounded-[2rem] border border-white/8 bg-[#0f0b16]/80 p-6 shadow-[0_24px_90px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+    <div className="rounded-[2rem] border border-[var(--sw-border)] bg-[var(--sw-panel)] p-6 shadow-[var(--sw-shadow)] backdrop-blur-xl">
       <div className="mb-4 flex items-center gap-3">
         {icon}
-        <h2 className="text-2xl text-[#fbf5ff] [font-family:var(--font-display)]">{title}</h2>
+        <h2 className="text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">{title}</h2>
       </div>
       {children}
     </div>
@@ -1772,16 +1848,16 @@ function ToggleRow({ label, description, enabled, onToggle }) {
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center justify-between gap-4 rounded-[1.4rem] border border-white/8 bg-white/4 px-4 py-4 text-left transition-all duration-200 hover:bg-white/7"
+      className="flex w-full items-center justify-between gap-4 rounded-[1.4rem] border border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] px-4 py-4 text-left transition-all duration-200 hover:bg-[var(--sw-panel-hover)]"
     >
       <div>
-        <div className="font-semibold text-[#f6efff]">{label}</div>
-        <div className="mt-1 text-sm leading-6 text-[#c8bdd6]">{description}</div>
+        <div className="font-semibold text-[var(--sw-title)]">{label}</div>
+        <div className="mt-1 text-sm leading-6 text-[var(--sw-muted)]">{description}</div>
       </div>
       <span
         className={classNames(
           "relative block h-7 w-12 shrink-0 rounded-full transition-all duration-200",
-          enabled ? "bg-[linear-gradient(135deg,#ff8fe1_0%,#9c62ff_100%)]" : "bg-white/10"
+          enabled ? "bg-[linear-gradient(135deg,#ff8fe1_0%,#9c62ff_100%)]" : "bg-[var(--sw-panel-hover)]"
         )}
       >
         <span
@@ -1805,8 +1881,8 @@ function UtilityButton({ icon, label, onClick, disabled = false, tone = "default
         "inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40",
         fullWidth && "flex w-full",
         tone === "warm"
-          ? "border-[#f08be8]/25 bg-[#f08be8]/12 text-[#ffd7fb] hover:bg-[#f08be8]/18"
-          : "border-white/10 bg-white/5 text-[#f6efff] hover:border-[#c98cff]/25 hover:bg-white/10"
+          ? "border-[#f08be8]/35 bg-[#f08be8]/14 text-[var(--sw-title)] hover:bg-[#f08be8]/22"
+          : "border-[var(--sw-border)] bg-[var(--sw-panel-soft)] text-[var(--sw-title)] hover:border-[#c98cff]/35 hover:bg-[var(--sw-panel-hover)]"
       )}
     >
       {icon}
@@ -1824,7 +1900,7 @@ function ModeButton({ active, onClick, children }) {
         "rounded-full border px-4 py-2.5 text-sm font-semibold transition-all duration-200",
         active
           ? "border-[#bc6cff]/40 bg-[#bc6cff] text-[#19091e]"
-          : "border-white/10 bg-white/5 text-[#ddcff2] hover:border-[#bc6cff]/25 hover:bg-white/10"
+          : "border-[var(--sw-border)] bg-[var(--sw-panel-soft)] text-[var(--sw-muted)] hover:border-[#bc6cff]/35 hover:bg-[var(--sw-panel-hover)]"
       )}
     >
       {children}
@@ -1833,16 +1909,16 @@ function ModeButton({ active, onClick, children }) {
 }
 
 function CounterPill({ digit, remaining, selected }) {
-  const helperTextClass = remaining === 0 ? "text-[#f0d0ff]" : selected ? "text-[#ffd4fa]" : "text-[#c8bdd6]";
+  const helperTextClass = remaining === 0 ? "text-[#9f58c7]" : selected ? "text-[#a12d93]" : "text-[var(--sw-muted)]";
 
   return (
     <div
       className={classNames(
         "flex min-w-0 flex-col items-center justify-center rounded-[1rem] border px-2 py-3 text-center transition-all duration-200",
         remaining === 0
-          ? "border-[#bc6cff]/30 bg-[#bc6cff]/12 text-[#f4e3ff]"
-          : "border-white/8 bg-[#18131f] text-[#f6efff]",
-        selected && remaining !== 0 && "border-[#f08be8]/35 bg-[#f08be8]/12 text-[#ffd9fb]"
+          ? "border-[#bc6cff]/30 bg-[#bc6cff]/12 text-[var(--sw-complete-text)]"
+          : "border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] text-[var(--sw-title)]",
+        selected && remaining !== 0 && "border-[#f08be8]/45 bg-[#f08be8]/16 text-[#a12d93]"
       )}
     >
       <div className="text-lg font-bold leading-none">{digit}</div>
@@ -1855,9 +1931,9 @@ function CounterPill({ digit, remaining, selected }) {
 
 function InlineStat({ label, value }) {
   return (
-    <div className="flex items-center justify-between rounded-[1rem] border border-white/6 bg-black/12 px-3 py-2.5">
-      <span className="text-sm text-[#ae9fc2]">{label}</span>
-      <span className="text-sm font-semibold text-[#f6efff]">{value}</span>
+    <div className="flex items-center justify-between rounded-[1rem] border border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] px-3 py-2.5">
+      <span className="text-sm text-[var(--sw-muted)]">{label}</span>
+      <span className="text-sm font-semibold text-[var(--sw-title)]">{value}</span>
     </div>
   );
 }
@@ -1867,11 +1943,11 @@ function BestTimeRow({ level, value, active }) {
     <div
       className={classNames(
         "flex items-center justify-between rounded-[1rem] border px-4 py-3",
-        active ? "border-[#f08be8]/25 bg-[#f08be8]/10" : "border-white/8 bg-white/4"
+        active ? "border-[#f08be8]/25 bg-[#f08be8]/10" : "border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)]"
       )}
     >
-      <span className="font-semibold text-[#f6efff]">{level}</span>
-      <span className="text-sm text-[#c8bdd6]">{value ? formatTime(value) : "--:--"}</span>
+      <span className="font-semibold text-[var(--sw-title)]">{level}</span>
+      <span className="text-sm text-[var(--sw-muted)]">{value ? formatTime(value) : "--:--"}</span>
     </div>
   );
 }
