@@ -717,6 +717,35 @@ function findConflictingValueCells(board, r, c, num) {
   return [...keys];
 }
 
+function removeNoteFromPeerGroups(notes, r, c, num) {
+  const next = copyNotes(notes);
+  const touched = new Set();
+
+  for (let index = 0; index < 9; index += 1) {
+    touched.add(`${r}-${index}`);
+    touched.add(`${index}-${c}`);
+  }
+
+  const boxRow = Math.floor(r / 3) * 3;
+  const boxCol = Math.floor(c / 3) * 3;
+  for (let row = boxRow; row < boxRow + 3; row += 1) {
+    for (let col = boxCol; col < boxCol + 3; col += 1) {
+      touched.add(`${row}-${col}`);
+    }
+  }
+
+  touched.delete(`${r}-${c}`);
+
+  for (const key of touched) {
+    const [row, col] = key.split("-").map(Number);
+    if (next[row][col].includes(num)) {
+      next[row][col] = next[row][col].filter((value) => value !== num);
+    }
+  }
+
+  return next;
+}
+
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
 }
@@ -1370,6 +1399,7 @@ export default function SudokuWizard() {
     if (r === null || c === null || completed) return;
     if (puzzleData.fixed[r][c]) return;
     if (num === board[r][c]) return;
+    const correctPlacement = num !== 0 && num === puzzleData.solution[r][c];
 
     if (noteMode && num !== 0 && board[r][c] === 0) {
       toggleNoteValue(r, c, num);
@@ -1386,13 +1416,13 @@ export default function SudokuWizard() {
     }
 
     setNotes((current) => {
-      const next = copyNotes(current);
+      const next = settings.liveValidation && correctPlacement ? removeNoteFromPeerGroups(current, r, c, num) : copyNotes(current);
       next[r][c] = [];
       return next;
     });
 
     if (num !== 0 && settings.liveValidation) {
-      triggerFeedback(`${r}-${c}`, num === puzzleData.solution[r][c] ? "correct" : "wrong");
+      triggerFeedback(`${r}-${c}`, correctPlacement ? "correct" : "wrong");
     }
   }
 
@@ -1430,7 +1460,7 @@ export default function SudokuWizard() {
     recordSolvedBoard(nextBoard);
 
     setNotes((current) => {
-      const next = copyNotes(current);
+      const next = settings.liveValidation ? removeNoteFromPeerGroups(current, r, c, nextValue) : copyNotes(current);
       next[r][c] = [];
       return next;
     });
