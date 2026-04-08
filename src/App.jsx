@@ -58,9 +58,9 @@ const LOFI_STREAMS = [
 ];
 
 const DIFFICULTIES = {
-  Easy: { clues: 38, hints: 8 },
-  Medium: { clues: 30, hints: 3 },
-  Hard: { clues: 24, hints: 0 },
+  Easy: { clues: 50, minClues: 48, hints: 8, minScore: 0, targetScore: 44, maxScore: 64, maxGuessDepth: 0, maxGuessCount: 0, minUnitClues: 4, minDigitClues: 3, restarts: 5 },
+  Medium: { clues: 44, minClues: 42, hints: 3, minScore: 34, targetScore: 62, maxScore: 140, maxGuessDepth: 1, maxGuessCount: 3, minUnitClues: 3, minDigitClues: 2, restarts: 6 },
+  Hard: { clues: 38, minClues: 36, hints: 0, minScore: 62, targetScore: 82, maxScore: 250, maxGuessDepth: 2, maxGuessCount: 8, minUnitClues: 2, minDigitClues: 1, restarts: 7 },
 };
 
 const DEFAULT_SETTINGS = {
@@ -188,6 +188,35 @@ const LIGHT_BOARD_COLORS = {
 };
 
 const range9 = Array.from({ length: 9 }, (_, index) => index + 1);
+const cellIndexes = Array.from({ length: 81 }, (_, index) => index);
+const allDigitMask = range9.reduce((mask, digit) => mask | (1 << digit), 0);
+const maskDigits = Array.from({ length: 1 << 10 }, (_, mask) => range9.filter((digit) => mask & (1 << digit)));
+const maskCounts = maskDigits.map((digits) => digits.length);
+const sudokuUnits = [
+  ...Array.from({ length: 9 }, (_, row) => Array.from({ length: 9 }, (_, col) => row * 9 + col)),
+  ...Array.from({ length: 9 }, (_, col) => Array.from({ length: 9 }, (_, row) => row * 9 + col)),
+  ...Array.from({ length: 9 }, (_, box) => {
+    const boxRow = Math.floor(box / 3) * 3;
+    const boxCol = (box % 3) * 3;
+    return Array.from({ length: 9 }, (_, index) => (boxRow + Math.floor(index / 3)) * 9 + boxCol + (index % 3));
+  }),
+];
+const cellPeers = cellIndexes.map((index) => {
+  const row = Math.floor(index / 9);
+  const col = index % 9;
+  const boxRow = Math.floor(row / 3) * 3;
+  const boxCol = Math.floor(col / 3) * 3;
+  const peers = new Set();
+
+  for (let offset = 0; offset < 9; offset += 1) {
+    peers.add(row * 9 + offset);
+    peers.add(offset * 9 + col);
+    peers.add((boxRow + Math.floor(offset / 3)) * 9 + boxCol + (offset % 3));
+  }
+
+  peers.delete(index);
+  return [...peers];
+});
 
 function shuffle(arr) {
   const copy = [...arr];
@@ -233,23 +262,271 @@ function readStoredSettings() {
   }
 }
 
-function generatePuzzle(difficulty) {
-  const solution = generateSolvedBoard();
-  const puzzle = copyBoard(solution);
-  const clues = DIFFICULTIES[difficulty]?.clues ?? DIFFICULTIES.Medium.clues;
-  let removals = 81 - clues;
+function boardToValues(board) {
+  return board.flat();
+}
 
-  const positions = shuffle(Array.from({ length: 81 }, (_, index) => index));
-  for (const pos of positions) {
-    if (removals <= 0) break;
-    const r = Math.floor(pos / 9);
-    const c = pos % 9;
-    puzzle[r][c] = 0;
-    removals -= 1;
+function countClues(board) {
+  return board.flat().filter((value) => value !== 0).length;
+}
+
+function hasBalancedClueSpread(board, profile) {
+  const values = boardToValues(board);
+  const digitClues = Object.fromEntries(range9.map((digit) => [digit, 0]));
+
+  for (const value of values) {
+    if (value !== 0) digitClues[value] += 1;
   }
 
-  const fixed = puzzle.map((row) => row.map((value) => value !== 0));
-  return { puzzle, solution, fixed };
+  if (range9.some((digit) => digitClues[digit] < profile.minDigitClues)) return false;
+
+  return sudokuUnits.every((unit) => unit.filter((index) => values[index] !== 0).length >= profile.minUnitClues);
+}
+
+function getCandidateMasks(values) {
+  const masks = Array(81).fill(0);
+
+  for (const index of cellIndexes) {
+    if (values[index] !== 0) continue;
+
+    let mask = allDigitMask;
+    for (const peer of cellPeers[index]) {
+      const peerValue = values[peer];
+      if (peerValue !== 0) mask &= ~(1 << peerValue);
+    }
+
+    if (mask === 0) return null;
+    masks[index] = mask;
+  }
+
+  return masks;
+}
+
+function applyLogicalSingles(values) {
+  const next = [...values];
+  let score = 0;
+  let nakedSingles = 0;
+  let hiddenSingles = 0;
+
+  while (true) {
+    const candidateMasks = getCandidateMasks(next);
+    if (!candidateMasks) return { status: "invalid", values: next, score, nakedSingles, hiddenSingles, candidateMasks: null };
+
+    const emptyIndexes = cellIndexes.filter((index) => next[index] === 0);
+    if (emptyIndexes.length === 0) return { status: "solved", values: next, score, nakedSingles, hiddenSingles, candidateMasks };
+
+    const nakedMoves = emptyIndexes
+      .filter((index) => maskCounts[candidateMasks[index]] === 1)
+      .map((index) => [index, maskDigits[candidateMasks[index]][0]]);
+
+    if (nakedMoves.length > 0) {
+      for (const [index, digit] of nakedMoves) next[index] = digit;
+      nakedSingles += nakedMoves.length;
+      score += nakedMoves.length;
+      continue;
+    }
+
+    const hiddenMoves = new Map();
+    for (const unit of sudokuUnits) {
+      for (const digit of range9) {
+        let target = null;
+        let count = 0;
+
+        for (const index of unit) {
+          if (next[index] !== 0 || !(candidateMasks[index] & (1 << digit))) continue;
+          target = index;
+          count += 1;
+          if (count > 1) break;
+        }
+
+        if (count === 1 && (!hiddenMoves.has(target) || hiddenMoves.get(target) === digit)) {
+          hiddenMoves.set(target, digit);
+        }
+      }
+    }
+
+    if (hiddenMoves.size > 0) {
+      for (const [index, digit] of hiddenMoves) next[index] = digit;
+      hiddenSingles += hiddenMoves.size;
+      score += hiddenMoves.size * 2;
+      continue;
+    }
+
+    return { status: "stuck", values: next, score, nakedSingles, hiddenSingles, candidateMasks };
+  }
+}
+
+function findTightestCell(values, candidateMasks) {
+  let bestIndex = -1;
+  let bestMask = 0;
+  let bestCount = 10;
+
+  for (const index of cellIndexes) {
+    if (values[index] !== 0) continue;
+
+    const mask = candidateMasks[index];
+    const count = maskCounts[mask];
+    if (count < bestCount) {
+      bestIndex = index;
+      bestMask = mask;
+      bestCount = count;
+    }
+  }
+
+  return bestIndex === -1 ? null : { index: bestIndex, mask: bestMask, count: bestCount };
+}
+
+function solveWithRating(values, depth, stats) {
+  if (stats.nodes > 140) return false;
+  stats.nodes += 1;
+
+  const reduced = applyLogicalSingles(values);
+  if (reduced.status === "invalid") return false;
+  if (reduced.status === "solved") return true;
+
+  const branch = findTightestCell(reduced.values, reduced.candidateMasks);
+  if (!branch) return false;
+
+  stats.guessCount += 1;
+  stats.maxGuessDepth = Math.max(stats.maxGuessDepth, depth + 1);
+  stats.guessScore += (branch.count - 1) * 22 * (depth + 1) + 8;
+
+  for (const digit of maskDigits[branch.mask]) {
+    const next = [...reduced.values];
+    next[branch.index] = digit;
+    if (solveWithRating(next, depth + 1, stats)) return true;
+  }
+
+  return false;
+}
+
+function ratePuzzle(board) {
+  const values = boardToValues(board);
+  const clueCount = values.filter((value) => value !== 0).length;
+  const openingMasks = getCandidateMasks(values);
+  const openingIndexes = cellIndexes.filter((index) => values[index] === 0);
+  const candidatePressure = openingMasks
+    ? openingIndexes.reduce((total, index) => total + maskCounts[openingMasks[index]], 0) * 0.08
+    : 999;
+  const reduced = applyLogicalSingles(values);
+  const baseScore = (81 - clueCount) * 0.25 + candidatePressure + reduced.score;
+
+  if (reduced.status === "invalid") {
+    return { solved: false, score: 999, guessCount: 99, maxGuessDepth: 99 };
+  }
+
+  if (reduced.status === "solved") {
+    return {
+      solved: true,
+      score: Math.round(baseScore),
+      guessCount: 0,
+      maxGuessDepth: 0,
+    };
+  }
+
+  const stats = { nodes: 0, guessCount: 0, maxGuessDepth: 0, guessScore: 0 };
+  const solved = solveWithRating(reduced.values, 0, stats);
+
+  return {
+    solved,
+    score: Math.round(baseScore + stats.guessScore + stats.nodes * 0.6),
+    guessCount: stats.guessCount,
+    maxGuessDepth: stats.maxGuessDepth,
+  };
+}
+
+function countSolutions(values, limit = 2) {
+  const reduced = applyLogicalSingles(values);
+  if (reduced.status === "invalid") return 0;
+  if (reduced.status === "solved") return 1;
+
+  const branch = findTightestCell(reduced.values, reduced.candidateMasks);
+  if (!branch) return 0;
+
+  let total = 0;
+  for (const digit of maskDigits[branch.mask]) {
+    const next = [...reduced.values];
+    next[branch.index] = digit;
+    total += countSolutions(next, limit - total);
+    if (total >= limit) return total;
+  }
+
+  return total;
+}
+
+function puzzleFitsDifficulty(rating, profile) {
+  return (
+    rating.solved &&
+    rating.score <= profile.maxScore &&
+    rating.maxGuessDepth <= profile.maxGuessDepth &&
+    rating.guessCount <= profile.maxGuessCount
+  );
+}
+
+function puzzleTargetPenalty(rating, clueCount, profile) {
+  const tooEasyPenalty = Math.max(0, profile.minScore - rating.score) * 1.5;
+  return Math.abs(rating.score - profile.targetScore) + Math.abs(clueCount - profile.clues) * 3 + tooEasyPenalty;
+}
+
+function carveRatedPuzzle(solution, profile) {
+  let puzzle = copyBoard(solution);
+  let bestPuzzle = copyBoard(puzzle);
+  let bestRating = ratePuzzle(puzzle);
+  let bestPenalty = puzzleTargetPenalty(bestRating, countClues(puzzle), profile);
+
+  for (const pos of shuffle(cellIndexes)) {
+    const clueCount = countClues(puzzle);
+    if (clueCount <= profile.minClues) break;
+
+    const r = Math.floor(pos / 9);
+    const c = pos % 9;
+    if (puzzle[r][c] === 0) continue;
+
+    const trial = copyBoard(puzzle);
+    trial[r][c] = 0;
+
+    if (!hasBalancedClueSpread(trial, profile)) continue;
+
+    const trialRating = ratePuzzle(trial);
+    if (!puzzleFitsDifficulty(trialRating, profile)) continue;
+    if (countSolutions(boardToValues(trial), 2) !== 1) continue;
+
+    puzzle = trial;
+
+    const trialClueCount = clueCount - 1;
+    const penalty = puzzleTargetPenalty(trialRating, trialClueCount, profile);
+    if (penalty < bestPenalty) {
+      bestPuzzle = copyBoard(trial);
+      bestRating = trialRating;
+      bestPenalty = penalty;
+    }
+  }
+
+  return { puzzle: bestPuzzle, rating: bestRating };
+}
+
+function generatePuzzle(difficulty) {
+  const profile = DIFFICULTIES[difficulty] ?? DIFFICULTIES.Medium;
+  let best = null;
+  let bestPenalty = Infinity;
+
+  for (let attempt = 0; attempt < profile.restarts; attempt += 1) {
+    const solution = generateSolvedBoard();
+    const { puzzle, rating } = carveRatedPuzzle(solution, profile);
+    const clueCount = countClues(puzzle);
+    const penalty = puzzleTargetPenalty(rating, clueCount, profile);
+
+    if (penalty < bestPenalty) {
+      best = { puzzle, solution, fixed: puzzle.map((row) => row.map((value) => value !== 0)) };
+      bestPenalty = penalty;
+    }
+
+    if (clueCount <= profile.clues && clueCount >= profile.minClues && rating.score >= profile.minScore) {
+      return best;
+    }
+  }
+
+  return best;
 }
 
 function formatTime(seconds) {
