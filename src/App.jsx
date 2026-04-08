@@ -40,7 +40,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { auth, db } from "./firebase";
+import { auth, db, firebaseReady } from "./firebase";
 
 const MotionHeader = motion.header;
 const MotionSection = motion.section;
@@ -255,9 +255,9 @@ function clamp(value, min, max) {
 }
 
 export default function SudokuWizard() {
-  const [accountMode, setAccountMode] = useState("loading");
+  const [accountMode, setAccountMode] = useState(firebaseReady ? "loading" : "gate");
   const [authUser, setAuthUser] = useState(null);
-  const [accountMessage, setAccountMessage] = useState("");
+  const [accountMessage, setAccountMessage] = useState(firebaseReady ? "" : "Firebase is not configured yet.");
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileTab, setProfileTab] = useState("scores");
   const [profile, setProfile] = useState(createDefaultProfile);
@@ -299,6 +299,8 @@ export default function SudokuWizard() {
   }, [timerIsRunning]);
 
   useEffect(() => {
+    if (!firebaseReady || !auth) return undefined;
+
     return onAuthStateChanged(auth, (user) => {
       setAuthUser(user);
 
@@ -317,7 +319,7 @@ export default function SudokuWizard() {
   }, []);
 
   useEffect(() => {
-    if (!authUser) return undefined;
+    if (!authUser || !db) return undefined;
 
     const profileRef = doc(db, "users", authUser.uid);
     setDoc(
@@ -360,7 +362,7 @@ export default function SudokuWizard() {
     : null;
 
   function saveProfilePatch(patch) {
-    if (!authUser) return;
+    if (!authUser || !db) return;
 
     setDoc(
       doc(db, "users", authUser.uid),
@@ -388,11 +390,13 @@ export default function SudokuWizard() {
 
   async function handleSignIn(email, password) {
     setAccountMessage("");
+    if (!firebaseReady || !auth) throw new Error("Firebase is not configured yet.");
     await signInWithEmailAndPassword(auth, email, password);
   }
 
   async function handleSignUp(email, password) {
     setAccountMessage("");
+    if (!firebaseReady || !auth || !db) throw new Error("Firebase is not configured yet.");
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     await setDoc(
       doc(db, "users", credential.user.uid),
@@ -412,11 +416,13 @@ export default function SudokuWizard() {
 
   async function handlePasswordReset(email) {
     setAccountMessage("");
+    if (!firebaseReady || !auth) throw new Error("Firebase is not configured yet.");
     await sendPasswordResetEmail(auth, email);
     setAccountMessage("Password reset email sent.");
   }
 
   async function handleLogout() {
+    if (!auth) return;
     await signOut(auth);
     setProfileOpen(false);
     setAccountMode("gate");

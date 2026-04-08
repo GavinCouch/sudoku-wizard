@@ -4,20 +4,21 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAb9Vlu0THC1GTPW2Rd6GbPgCxh3seIttU",
-  authDomain: "sudoku-wizard-f341c.firebaseapp.com",
-  projectId: "sudoku-wizard-f341c",
-  storageBucket: "sudoku-wizard-f341c.firebasestorage.app",
-  messagingSenderId: "944124169907",
-  appId: "1:944124169907:web:c5045a8172e16fb3122ac6",
-  measurementId: "G-ZEVX38J8W3",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const firebaseReady = Object.values(firebaseConfig).every(Boolean);
+export const app = firebaseReady ? initializeApp(firebaseConfig) : null;
+export const auth = app ? getAuth(app) : null;
+export const db = app ? getFirestore(app) : null;
 
-if (typeof window !== "undefined") {
+if (firebaseReady && app && typeof window !== "undefined") {
   isSupported()
     .then((supported) => {
       if (supported) getAnalytics(app);
