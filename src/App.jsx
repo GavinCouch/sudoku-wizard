@@ -18,6 +18,7 @@ import {
   LogOut,
   Mail,
   Moon,
+  Music2,
   NotebookPen,
   PlayCircle,
   RotateCcw,
@@ -48,6 +49,13 @@ const MotionAside = motion.aside;
 const MotionButton = motion.button;
 
 const MAX_ARCHIVES = 9;
+const LOFI_STREAMS = [
+  { name: "0R LO-FI", url: "https://stream.0nlineradio.com/lo-fi?ref=sudoku-wizard" },
+  { name: "LoFi Radio", url: "https://live.lofiradio.ru/lofi_mp3_128" },
+  { name: "Chillsky Lofi", url: "https://chill.radioca.st/stream" },
+  { name: "Lofi Radio Africa", url: "https://play.streamafrica.net/lofiradio" },
+  { name: "laut.fm lofi", url: "https://stream.laut.fm/lofi" },
+];
 
 const DIFFICULTIES = {
   Easy: { clues: 38, hints: 8 },
@@ -61,6 +69,8 @@ const DEFAULT_SETTINGS = {
   remainingCounts: true,
   liveValidation: true,
   lightMode: false,
+  lofiEnabled: false,
+  lofiVolume: 35,
 };
 
 const SETTINGS_STORAGE_KEY = "sudoku-wizard-settings";
@@ -90,6 +100,11 @@ const SETTINGS_LIST = [
     key: "lightMode",
     label: "Light mode",
     description: "Swap the site between dark and light.",
+  },
+  {
+    key: "lofiEnabled",
+    label: "Lofi hip hop",
+    description: "Stream a lofi station while you play.",
   },
 ];
 
@@ -207,14 +222,14 @@ function copyNotes(notes) {
 }
 
 function readStoredSettings() {
-  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  if (typeof window === "undefined") return normalizeSettings();
 
   try {
     const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (!raw) return normalizeSettings();
+    return normalizeSettings(JSON.parse(raw));
   } catch {
-    return DEFAULT_SETTINGS;
+    return normalizeSettings();
   }
 }
 
@@ -260,7 +275,7 @@ function createDefaultProfile(email = "") {
   return {
     email,
     avatarId: DEFAULT_AVATAR_ID,
-    settings: DEFAULT_SETTINGS,
+    settings: normalizeSettings(),
     bestTimes: {},
     gamesCompleted: 0,
     archives: [],
@@ -279,7 +294,7 @@ function normalizeProfile(data, user) {
   return {
     email: data?.email ?? profile.email,
     avatarId: avatarExists ? data.avatarId : profile.avatarId,
-    settings: { ...DEFAULT_SETTINGS, ...(data?.settings ?? {}) },
+    settings: normalizeSettings(data?.settings),
     bestTimes: data?.bestTimes && typeof data.bestTimes === "object" ? data.bestTimes : {},
     gamesCompleted: Number.isFinite(data?.gamesCompleted) ? data.gamesCompleted : 0,
     archives: archiveValues
@@ -413,6 +428,20 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function normalizeLofiVolume(volume) {
+  const numericVolume = Number(volume);
+  return Number.isFinite(numericVolume) ? clamp(Math.round(numericVolume), 0, 100) : DEFAULT_SETTINGS.lofiVolume;
+}
+
+function normalizeSettings(settings = {}) {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...settings,
+    lofiEnabled: Boolean(settings.lofiEnabled),
+    lofiVolume: normalizeLofiVolume(settings.lofiVolume ?? DEFAULT_SETTINGS.lofiVolume),
+  };
+}
+
 function authErrorMessage(error) {
   if (error?.code === "auth/configuration-not-found" || error?.message?.includes("CONFIGURATION_NOT_FOUND")) {
     return "Firebase Authentication is not enabled for this project yet. Enable Authentication and the Email/Password provider in Firebase Console.";
@@ -460,6 +489,9 @@ export default function SudokuWizard() {
   const [archiveSaving, setArchiveSaving] = useState(false);
   const [board, setBoard] = useState(puzzleData.puzzle);
   const [notes, setNotes] = useState(createEmptyNotes);
+  const lofiAudioRef = useRef(null);
+  const [lofiStatus, setLofiStatus] = useState("Off");
+  const [lofiStreamIndex, setLofiStreamIndex] = useState(0);
 
   const remaining = useMemo(() => countRemaining(board, puzzleData.solution), [board, puzzleData.solution]);
   const filledCount = useMemo(
@@ -473,6 +505,8 @@ export default function SudokuWizard() {
   const timerIsRunning = settings.timerEnabled && !timerLocked && !completed;
   const themeVars = settings.lightMode ? LIGHT_THEME : DARK_THEME;
   const boardColors = settings.lightMode ? LIGHT_BOARD_COLORS : DARK_BOARD_COLORS;
+  const lofiVolume = normalizeLofiVolume(settings.lofiVolume);
+  const currentLofiStream = LOFI_STREAMS[lofiStreamIndex] ?? LOFI_STREAMS[0];
   const pageStyle = {
     ...themeVars,
     background: settings.lightMode
@@ -498,6 +532,46 @@ export default function SudokuWizard() {
 
   function showGamePage() {
     setAppRoute("game");
+  }
+
+  async function playLofiStream(streamIndex = lofiStreamIndex, volume = lofiVolume) {
+    const audio = lofiAudioRef.current;
+    if (!audio) return;
+
+    const stream = LOFI_STREAMS[streamIndex] ?? LOFI_STREAMS[0];
+    setLofiStreamIndex(streamIndex);
+    audio.volume = normalizeLofiVolume(volume) / 100;
+
+    if (audio.getAttribute("src") !== stream.url) {
+      audio.src = stream.url;
+      audio.load();
+    }
+
+    setLofiStatus(`Connecting to ${stream.name}...`);
+
+    try {
+      await audio.play();
+      setLofiStatus(`Playing ${stream.name}`);
+    } catch {
+      setLofiStatus("Playback needs a tap. Press Play.");
+    }
+  }
+
+  function playNextLofiStream() {
+    const nextIndex = (lofiStreamIndex + 1) % LOFI_STREAMS.length;
+    void playLofiStream(nextIndex);
+  }
+
+  function handleLofiStreamError() {
+    const nextIndex = (lofiStreamIndex + 1) % LOFI_STREAMS.length;
+    setLofiStreamIndex(nextIndex);
+    setLofiStatus(`Station failed. Press Play to try ${LOFI_STREAMS[nextIndex].name}.`);
+  }
+
+  function pauseLofiStream() {
+    const audio = lofiAudioRef.current;
+    if (audio) audio.pause();
+    setLofiStatus("Off");
   }
 
   function applyProfileData(nextProfile) {
@@ -648,6 +722,17 @@ export default function SudokuWizard() {
     window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
   }, [settings]);
 
+  useEffect(() => {
+    const audio = lofiAudioRef.current;
+    if (!audio) return;
+
+    audio.volume = lofiVolume / 100;
+
+    if (!settings.lofiEnabled) {
+      audio.pause();
+    }
+  }, [lofiVolume, settings.lofiEnabled]);
+
   const selectedValue = selected.r !== null && selected.c !== null ? board[selected.r][selected.c] : null;
   const hintLimit = DIFFICULTIES[difficulty].hints;
   const hintsRemaining = Math.max(0, hintLimit - hintCount);
@@ -721,10 +806,27 @@ export default function SudokuWizard() {
 
   function commitSettings(updater) {
     setSettings((current) => {
-      const next = typeof updater === "function" ? updater(current) : updater;
+      const next = normalizeSettings(typeof updater === "function" ? updater(current) : updater);
       if (isSignedIn) void saveProfilePatch({ settings: next });
       return next;
     });
+  }
+
+  function setLofiEnabled(enabled) {
+    commitSettings((current) => ({ ...current, lofiEnabled: enabled }));
+
+    if (enabled) {
+      void playLofiStream(lofiStreamIndex);
+    } else {
+      pauseLofiStream();
+    }
+  }
+
+  function setLofiVolume(volume) {
+    const nextVolume = normalizeLofiVolume(volume);
+    const audio = lofiAudioRef.current;
+    if (audio) audio.volume = nextVolume / 100;
+    commitSettings((current) => ({ ...current, lofiVolume: nextVolume }));
   }
 
   function updateAvatar(avatarId) {
@@ -1540,6 +1642,20 @@ export default function SudokuWizard() {
         onClose={() => setSettingsOpen(false)}
         settings={settings}
         onSettingsChange={commitSettings}
+        onLofiEnabledChange={setLofiEnabled}
+        onLofiVolumeChange={setLofiVolume}
+        onLofiPlay={() => playLofiStream(lofiStreamIndex)}
+        onLofiNext={playNextLofiStream}
+        lofiStation={currentLofiStream.name}
+        lofiStatus={lofiStatus}
+      />
+      <audio
+        ref={lofiAudioRef}
+        src={currentLofiStream.url}
+        preload="none"
+        onPlay={() => setLofiStatus(`Playing ${currentLofiStream.name}`)}
+        onPause={() => setLofiStatus("Off")}
+        onError={handleLofiStreamError}
       />
     </div>
   );
@@ -1933,7 +2049,7 @@ function ProfileDrawer({
   );
 }
 
-function SettingsDrawer({ open, onClose, settings, onSettingsChange }) {
+function SettingsDrawer({ open, onClose, settings, onSettingsChange, onLofiEnabledChange, onLofiVolumeChange, onLofiPlay, onLofiNext, lofiStation, lofiStatus }) {
   return (
     <AnimatePresence>
       {open && (
@@ -1974,18 +2090,34 @@ function SettingsDrawer({ open, onClose, settings, onSettingsChange }) {
               <ProfilePanel icon={<Settings className="h-5 w-5 text-[#f3a3eb]" />} title="Settings">
                 <div className="space-y-3">
                   {SETTINGS_LIST.map((item) => (
-                    <ToggleRow
-                      key={item.key}
-                      label={item.label}
-                      description={item.description}
-                      enabled={settings[item.key]}
-                      onToggle={() =>
-                        onSettingsChange((current) => ({
-                          ...current,
-                          [item.key]: !current[item.key],
-                        }))
-                      }
-                    />
+                    <div key={item.key}>
+                      <ToggleRow
+                        label={item.label}
+                        description={item.description}
+                        enabled={settings[item.key]}
+                        onToggle={() => {
+                          if (item.key === "lofiEnabled") {
+                            onLofiEnabledChange(!settings.lofiEnabled);
+                            return;
+                          }
+
+                          onSettingsChange((current) => ({
+                            ...current,
+                            [item.key]: !current[item.key],
+                          }));
+                        }}
+                      />
+                      {item.key === "lofiEnabled" && settings.lofiEnabled && (
+                        <LofiVolumeControl
+                          volume={settings.lofiVolume}
+                          status={lofiStatus}
+                          station={lofiStation}
+                          onChange={onLofiVolumeChange}
+                          onPlay={onLofiPlay}
+                          onNext={onLofiNext}
+                        />
+                      )}
+                    </div>
                   ))}
                 </div>
               </ProfilePanel>
@@ -1994,6 +2126,55 @@ function SettingsDrawer({ open, onClose, settings, onSettingsChange }) {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function LofiVolumeControl({ volume, status, station, onChange, onPlay, onNext }) {
+  const safeVolume = normalizeLofiVolume(volume);
+  const streamActive = status.startsWith("Playing ");
+
+  return (
+    <div className="mt-3 rounded-[1.25rem] border border-[#f08be8]/25 bg-[#f08be8]/10 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-[var(--sw-title)]">
+          <Music2 className="h-4 w-4 text-[#f3a3eb]" />
+          Volume
+        </div>
+        <div className="text-sm font-semibold text-[#f3a3eb]">{safeVolume}%</div>
+      </div>
+      <div className="mt-1 text-xs text-[var(--sw-muted)]">Station: {station}</div>
+      <input
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value={safeVolume}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-4 w-full accent-[#f08be8]"
+      />
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-xs leading-5 text-[var(--sw-muted)]">
+          {status === "Off" ? "Press Play to start the stream." : status}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onPlay}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[#f08be8]/35 bg-[#f08be8]/14 px-3 py-2 text-xs font-semibold text-[var(--sw-title)] transition-all duration-200 hover:bg-[#f08be8]/22"
+          >
+            <PlayCircle className="h-3.5 w-3.5" />
+            {streamActive ? "Restart" : "Play"}
+          </button>
+          <button
+            type="button"
+            onClick={onNext}
+            className="rounded-full border border-[var(--sw-border)] bg-[var(--sw-panel-soft)] px-3 py-2 text-xs font-semibold text-[var(--sw-title)] transition-all duration-200 hover:bg-[var(--sw-panel-hover)]"
+          >
+            Try another
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
