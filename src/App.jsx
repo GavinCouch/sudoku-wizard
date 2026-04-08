@@ -49,7 +49,13 @@ const MotionAside = motion.aside;
 const MotionButton = motion.button;
 
 const MAX_ARCHIVES = 9;
-const LOFI_STREAM_URL = "https://stream.zeno.fm/hqbrk7skwxhvv";
+const LOFI_STREAMS = [
+  { name: "0R LO-FI", url: "https://stream.0nlineradio.com/lo-fi?ref=sudoku-wizard" },
+  { name: "LoFi Radio", url: "https://live.lofiradio.ru/lofi_mp3_128" },
+  { name: "Chillsky Lofi", url: "https://chill.radioca.st/stream" },
+  { name: "Lofi Radio Africa", url: "https://play.streamafrica.net/lofiradio" },
+  { name: "laut.fm lofi", url: "https://stream.laut.fm/lofi" },
+];
 
 const DIFFICULTIES = {
   Easy: { clues: 38, hints: 8 },
@@ -485,6 +491,7 @@ export default function SudokuWizard() {
   const [notes, setNotes] = useState(createEmptyNotes);
   const lofiAudioRef = useRef(null);
   const [lofiStatus, setLofiStatus] = useState("Off");
+  const [lofiStreamIndex, setLofiStreamIndex] = useState(0);
 
   const remaining = useMemo(() => countRemaining(board, puzzleData.solution), [board, puzzleData.solution]);
   const filledCount = useMemo(
@@ -499,6 +506,7 @@ export default function SudokuWizard() {
   const themeVars = settings.lightMode ? LIGHT_THEME : DARK_THEME;
   const boardColors = settings.lightMode ? LIGHT_BOARD_COLORS : DARK_BOARD_COLORS;
   const lofiVolume = normalizeLofiVolume(settings.lofiVolume);
+  const currentLofiStream = LOFI_STREAMS[lofiStreamIndex] ?? LOFI_STREAMS[0];
   const pageStyle = {
     ...themeVars,
     background: settings.lightMode
@@ -526,19 +534,38 @@ export default function SudokuWizard() {
     setAppRoute("game");
   }
 
-  async function playLofiStream(volume = lofiVolume) {
+  async function playLofiStream(streamIndex = lofiStreamIndex, volume = lofiVolume) {
     const audio = lofiAudioRef.current;
     if (!audio) return;
 
+    const stream = LOFI_STREAMS[streamIndex] ?? LOFI_STREAMS[0];
+    setLofiStreamIndex(streamIndex);
     audio.volume = normalizeLofiVolume(volume) / 100;
-    setLofiStatus("Connecting...");
+
+    if (audio.getAttribute("src") !== stream.url) {
+      audio.src = stream.url;
+      audio.load();
+    }
+
+    setLofiStatus(`Connecting to ${stream.name}...`);
 
     try {
       await audio.play();
-      setLofiStatus("Streaming lofi hip hop");
+      setLofiStatus(`Playing ${stream.name}`);
     } catch {
       setLofiStatus("Playback needs a tap. Press Play.");
     }
+  }
+
+  function playNextLofiStream() {
+    const nextIndex = (lofiStreamIndex + 1) % LOFI_STREAMS.length;
+    void playLofiStream(nextIndex);
+  }
+
+  function handleLofiStreamError() {
+    const nextIndex = (lofiStreamIndex + 1) % LOFI_STREAMS.length;
+    setLofiStreamIndex(nextIndex);
+    setLofiStatus(`Station failed. Press Play to try ${LOFI_STREAMS[nextIndex].name}.`);
   }
 
   function pauseLofiStream() {
@@ -789,7 +816,7 @@ export default function SudokuWizard() {
     commitSettings((current) => ({ ...current, lofiEnabled: enabled }));
 
     if (enabled) {
-      void playLofiStream();
+      void playLofiStream(lofiStreamIndex);
     } else {
       pauseLofiStream();
     }
@@ -1617,16 +1644,18 @@ export default function SudokuWizard() {
         onSettingsChange={commitSettings}
         onLofiEnabledChange={setLofiEnabled}
         onLofiVolumeChange={setLofiVolume}
-        onLofiPlay={() => playLofiStream()}
+        onLofiPlay={() => playLofiStream(lofiStreamIndex)}
+        onLofiNext={playNextLofiStream}
+        lofiStation={currentLofiStream.name}
         lofiStatus={lofiStatus}
       />
       <audio
         ref={lofiAudioRef}
-        src={LOFI_STREAM_URL}
+        src={currentLofiStream.url}
         preload="none"
-        onPlay={() => setLofiStatus("Streaming lofi hip hop")}
+        onPlay={() => setLofiStatus(`Playing ${currentLofiStream.name}`)}
         onPause={() => setLofiStatus("Off")}
-        onError={() => setLofiStatus("Stream unavailable. Try again later.")}
+        onError={handleLofiStreamError}
       />
     </div>
   );
@@ -2020,7 +2049,7 @@ function ProfileDrawer({
   );
 }
 
-function SettingsDrawer({ open, onClose, settings, onSettingsChange, onLofiEnabledChange, onLofiVolumeChange, onLofiPlay, lofiStatus }) {
+function SettingsDrawer({ open, onClose, settings, onSettingsChange, onLofiEnabledChange, onLofiVolumeChange, onLofiPlay, onLofiNext, lofiStation, lofiStatus }) {
   return (
     <AnimatePresence>
       {open && (
@@ -2082,8 +2111,10 @@ function SettingsDrawer({ open, onClose, settings, onSettingsChange, onLofiEnabl
                         <LofiVolumeControl
                           volume={settings.lofiVolume}
                           status={lofiStatus}
+                          station={lofiStation}
                           onChange={onLofiVolumeChange}
                           onPlay={onLofiPlay}
+                          onNext={onLofiNext}
                         />
                       )}
                     </div>
@@ -2098,9 +2129,9 @@ function SettingsDrawer({ open, onClose, settings, onSettingsChange, onLofiEnabl
   );
 }
 
-function LofiVolumeControl({ volume, status, onChange, onPlay }) {
+function LofiVolumeControl({ volume, status, station, onChange, onPlay, onNext }) {
   const safeVolume = normalizeLofiVolume(volume);
-  const streamActive = status === "Streaming lofi hip hop";
+  const streamActive = status.startsWith("Playing ");
 
   return (
     <div className="mt-3 rounded-[1.25rem] border border-[#f08be8]/25 bg-[#f08be8]/10 p-4">
@@ -2111,6 +2142,7 @@ function LofiVolumeControl({ volume, status, onChange, onPlay }) {
         </div>
         <div className="text-sm font-semibold text-[#f3a3eb]">{safeVolume}%</div>
       </div>
+      <div className="mt-1 text-xs text-[var(--sw-muted)]">Station: {station}</div>
       <input
         type="range"
         min="0"
@@ -2124,14 +2156,23 @@ function LofiVolumeControl({ volume, status, onChange, onPlay }) {
         <div className="text-xs leading-5 text-[var(--sw-muted)]">
           {status === "Off" ? "Press Play to start the stream." : status}
         </div>
-        <button
-          type="button"
-          onClick={onPlay}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-[#f08be8]/35 bg-[#f08be8]/14 px-3 py-2 text-xs font-semibold text-[var(--sw-title)] transition-all duration-200 hover:bg-[#f08be8]/22"
-        >
-          <PlayCircle className="h-3.5 w-3.5" />
-          {streamActive ? "Restart" : "Play"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onPlay}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[#f08be8]/35 bg-[#f08be8]/14 px-3 py-2 text-xs font-semibold text-[var(--sw-title)] transition-all duration-200 hover:bg-[#f08be8]/22"
+          >
+            <PlayCircle className="h-3.5 w-3.5" />
+            {streamActive ? "Restart" : "Play"}
+          </button>
+          <button
+            type="button"
+            onClick={onNext}
+            className="rounded-full border border-[var(--sw-border)] bg-[var(--sw-panel-soft)] px-3 py-2 text-xs font-semibold text-[var(--sw-title)] transition-all duration-200 hover:bg-[var(--sw-panel-hover)]"
+          >
+            Try another
+          </button>
+        </div>
       </div>
     </div>
   );
