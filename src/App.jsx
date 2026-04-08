@@ -22,13 +22,13 @@ import {
   PlayCircle,
   RotateCcw,
   Save,
+  Settings,
   ShieldCheck,
   Sparkles,
   Star,
   Sun,
   Trash2,
   Trophy,
-  User,
   WandSparkles,
   X,
 } from "lucide-react";
@@ -39,7 +39,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { deleteField, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { deleteField, doc, getDocFromServer, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, firebaseReady } from "./firebase";
 
 const MotionHeader = motion.header;
@@ -425,14 +425,21 @@ function authErrorMessage(error) {
   return error?.message ?? "Something went wrong.";
 }
 
+function readRoute() {
+  if (typeof window === "undefined") return "game";
+  return window.location.hash === "#/account" ? "account" : "game";
+}
+
 export default function SudokuWizard() {
-  const [accountMode, setAccountMode] = useState(firebaseReady ? "loading" : "gate");
+  const [accountMode, setAccountMode] = useState(firebaseReady ? "loading" : "guest");
   const [authUser, setAuthUser] = useState(null);
   const legacyArchivesMigrated = useRef(false);
   const [profileLoaded, setProfileLoaded] = useState(!firebaseReady);
   const [accountMessage, setAccountMessage] = useState(firebaseReady ? "" : "Firebase is not configured yet.");
   const [profileOpen, setProfileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileTab, setProfileTab] = useState("scores");
+  const [route, setRoute] = useState(readRoute);
   const [profile, setProfile] = useState(createDefaultProfile);
   const [difficulty, setDifficulty] = useState("Easy");
   const [settings, setSettings] = useState(readStoredSettings);
@@ -474,6 +481,56 @@ export default function SudokuWizard() {
     color: "var(--sw-text)",
   };
 
+  function setAppRoute(nextRoute) {
+    setRoute(nextRoute);
+    if (typeof window === "undefined") return;
+
+    const nextHash = nextRoute === "account" ? "#/account" : "#/";
+    if (window.location.hash !== nextHash) window.location.hash = nextHash;
+  }
+
+  function showAccountPage() {
+    setAccountMessage("");
+    setProfileOpen(false);
+    setSettingsOpen(false);
+    setAppRoute("account");
+  }
+
+  function showGamePage() {
+    setAppRoute("game");
+  }
+
+  function applyProfileData(nextProfile) {
+    setProfile(nextProfile);
+    setSettings(nextProfile.settings);
+    setBestTimes(nextProfile.bestTimes);
+    setGamesCompleted(nextProfile.gamesCompleted);
+    setArchives(nextProfile.archives);
+  }
+
+  function migrateLegacyArchives(profileRef, snapshotData, nextProfile) {
+    if (legacyArchivesMigrated.current || !Array.isArray(snapshotData?.archives) || snapshotData.archives.length === 0) return;
+
+    legacyArchivesMigrated.current = true;
+    const archivePatch = Object.fromEntries(
+      nextProfile.archives.map((archive) => [`archivesById.${archive.id}`, serializeArchive(archive)])
+    );
+    updateDoc(profileRef, {
+      ...archivePatch,
+      archives: deleteField(),
+      updatedAt: serverTimestamp(),
+    }).catch((error) => setAccountMessage(authErrorMessage(error)));
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const syncRoute = () => setRoute(readRoute());
+    syncRoute();
+    window.addEventListener("hashchange", syncRoute);
+    return () => window.removeEventListener("hashchange", syncRoute);
+  }, []);
+
   useEffect(() => {
     if (!timerIsRunning) return undefined;
 
@@ -489,7 +546,7 @@ export default function SudokuWizard() {
       setAuthUser(user);
 
       if (user) {
-        setAccountMode("user");
+        setAccountMode("loadingProfile");
         setAccountMessage("");
         setProfileLoaded(false);
         return;
@@ -500,50 +557,91 @@ export default function SudokuWizard() {
       setGamesCompleted(0);
       setArchives([]);
       setProfileLoaded(true);
-      setAccountMode((current) => (current === "guest" ? "guest" : "gate"));
+      setProfileOpen(false);
+      setAccountMode("guest");
     });
   }, []);
 
   useEffect(() => {
     if (!authUser || !db) return undefined;
 
+    let cancelled = false;
+    let unsubscribe = () => {};
     const profileRef = doc(db, "users", authUser.uid);
-    setDoc(
-      profileRef,
-      {
-        email: authUser.email ?? "",
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    ).catch((error) => setAccountMessage(authErrorMessage(error)));
 
-    return onSnapshot(
-      profileRef,
-      { includeMetadataChanges: true },
-      (snapshot) => {
-        const snapshotData = snapshot.data();
-        const nextProfile = normalizeProfile(snapshotData, authUser);
-        if (!snapshot.metadata.fromCache) setProfileLoaded(true);
-        setProfile(nextProfile);
-        setSettings(nextProfile.settings);
-        setBestTimes(nextProfile.bestTimes);
-        setGamesCompleted(nextProfile.gamesCompleted);
-        setArchives(nextProfile.archives);
+    async function loadServerProfile() {
+      try {
+        setAccountMode("loadingProfile");
+        setProfileLoaded(false);
 
-        if (!legacyArchivesMigrated.current && Array.isArray(snapshotData?.archives) && snapshotData.archives.length > 0) {
-          legacyArchivesMigrated.current = true;
-          const archivePatch = Object.fromEntries(
-            nextProfile.archives.map((archive) => [`archivesById.${archive.id}`, serializeArchive(archive)])
+        const snapshot = await getDocFromServer(profileRef);
+        const snapshotData = snapshot.exists() ? snapshot.data() : undefined;
+        const nextProfile = snapshot.exists() ? normalizeProfile(snapshotData, authUser) : createDefaultProfile(authUser.email ?? "");
+
+        if (snapshot.exists()) {
+          await setDoc(
+            profileRef,
+            {
+              email: authUser.email ?? "",
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
           );
-          updateDoc(profileRef, {
-            ...archivePatch,
-            archives: deleteField(),
-            updatedAt: serverTimestamp(),
-          }).catch((error) => setAccountMessage(authErrorMessage(error)));
+        } else {
+          await setDoc(
+            profileRef,
+            {
+              email: authUser.email ?? "",
+              avatarId: DEFAULT_AVATAR_ID,
+              settings: nextProfile.settings,
+              bestTimes: {},
+              gamesCompleted: 0,
+              archivesById: {},
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
         }
-      },
-      (error) => setAccountMessage(authErrorMessage(error))
-    );
+
+        if (cancelled) return;
+
+        applyProfileData(nextProfile);
+        setProfileLoaded(true);
+        setAccountMode("user");
+        setAccountMessage("");
+        migrateLegacyArchives(profileRef, snapshotData, nextProfile);
+
+        unsubscribe = onSnapshot(
+          profileRef,
+          { includeMetadataChanges: true },
+          (liveSnapshot) => {
+            if (cancelled || liveSnapshot.metadata.fromCache) return;
+
+            const liveData = liveSnapshot.data();
+            const liveProfile = normalizeProfile(liveData, authUser);
+            applyProfileData(liveProfile);
+            setProfileLoaded(true);
+            migrateLegacyArchives(profileRef, liveData, liveProfile);
+          },
+          (error) => {
+            if (!cancelled) setAccountMessage(authErrorMessage(error));
+          }
+        );
+      } catch (error) {
+        if (cancelled) return;
+        setAccountMessage(authErrorMessage(error));
+        setProfileLoaded(false);
+        setAccountMode("profileError");
+      }
+    }
+
+    void loadServerProfile();
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [authUser]);
 
   useEffect(() => {
@@ -637,7 +735,11 @@ export default function SudokuWizard() {
   async function handleSignIn(email, password) {
     setAccountMessage("");
     if (!firebaseReady || !auth) throw new Error("Firebase is not configured yet.");
-    await signInWithEmailAndPassword(auth, email, password);
+    const credential = await signInWithEmailAndPassword(auth, email, password);
+    setAuthUser(credential.user);
+    setProfileLoaded(false);
+    setAccountMode("loadingProfile");
+    showGamePage();
   }
 
   async function handleSignUp(email, password) {
@@ -658,6 +760,10 @@ export default function SudokuWizard() {
       },
       { merge: true }
     );
+    setAuthUser(credential.user);
+    setProfileLoaded(false);
+    setAccountMode("loadingProfile");
+    showGamePage();
   }
 
   async function handlePasswordReset(email) {
@@ -671,7 +777,9 @@ export default function SudokuWizard() {
     if (!auth) return;
     await signOut(auth);
     setProfileOpen(false);
-    setAccountMode("gate");
+    setSettingsOpen(false);
+    setAccountMode("guest");
+    showGamePage();
   }
 
   function continueAsGuest() {
@@ -681,6 +789,7 @@ export default function SudokuWizard() {
     setBestTimes({});
     setGamesCompleted(0);
     setArchives([]);
+    showGamePage();
   }
 
   function recordSolvedBoard(nextBoard) {
@@ -989,10 +1098,18 @@ export default function SudokuWizard() {
   }, []);
 
   if (accountMode === "loading") {
-    return <AccountGate loading message="Checking your account..." />;
+    return <AccountDataLoader title="Checking your sign-in" detail="Sudoku Wizard is checking whether this device already has an account session." />;
   }
 
-  if (accountMode === "gate") {
+  if (accountMode === "loadingProfile") {
+    return <AccountDataLoader title="Fetching your account data" detail="Syncing your avatar, archives, scores, and settings before the board loads." />;
+  }
+
+  if (accountMode === "profileError") {
+    return <AccountDataLoader title="Could not fetch your account data" detail={accountMessage} actionLabel="Log out" onAction={handleLogout} />;
+  }
+
+  if (route === "account" && !isSignedIn) {
     return (
       <AccountGate
         message={accountMessage}
@@ -1037,17 +1154,35 @@ export default function SudokuWizard() {
             </div>
 
             <div className="flex flex-col gap-4 xl:items-end">
-              <button
-                type="button"
-                onClick={() => setProfileOpen(true)}
-                className="inline-flex items-center gap-3 self-start rounded-full border border-[var(--sw-border)] bg-[var(--sw-panel-soft)] p-2 pr-4 text-sm font-semibold text-[var(--sw-title)] shadow-[var(--sw-shadow-tight)] transition-all duration-200 hover:border-[#f08be8]/35 hover:bg-[var(--sw-panel-hover)] xl:self-end"
-              >
-                <span className={classNames("flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br", activeAvatar.gradient)}>
-                  <ActiveAvatarIcon className="h-6 w-6 text-white" />
-                </span>
-                <span>{isSignedIn ? "Profile" : "Guest"}</span>
-                <ChevronDown className="h-4 w-4 text-[var(--sw-muted)]" />
-              </button>
+              <div className="flex flex-wrap items-center gap-2 self-start xl:self-end">
+                {isSignedIn ? (
+                  <button
+                    type="button"
+                    onClick={() => setProfileOpen(true)}
+                    className="inline-flex items-center gap-3 rounded-full border border-[var(--sw-border)] bg-[var(--sw-panel-soft)] p-2 pr-4 text-sm font-semibold text-[var(--sw-title)] shadow-[var(--sw-shadow-tight)] transition-all duration-200 hover:border-[#f08be8]/35 hover:bg-[var(--sw-panel-hover)]"
+                  >
+                    <span className={classNames("flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br", activeAvatar.gradient)}>
+                      <ActiveAvatarIcon className="h-6 w-6 text-white" />
+                    </span>
+                    <span>Profile</span>
+                    <ChevronDown className="h-4 w-4 text-[var(--sw-muted)]" />
+                  </button>
+                ) : (
+                  <UtilityButton
+                    icon={<CircleUserRound className="h-4 w-4" />}
+                    label="Log in"
+                    onClick={showAccountPage}
+                  />
+                )}
+                <button
+                  type="button"
+                  aria-label="Open settings"
+                  onClick={() => setSettingsOpen(true)}
+                  className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-[var(--sw-border)] bg-[var(--sw-panel-soft)] text-[var(--sw-title)] shadow-[var(--sw-shadow-tight)] transition-all duration-200 hover:border-[#f08be8]/35 hover:bg-[var(--sw-panel-hover)]"
+                >
+                  <Settings className="h-5 w-5" />
+                </button>
+              </div>
 
               <div className="flex flex-wrap gap-2 xl:justify-end">
                 {Object.entries(DIFFICULTIES).map(([level, info]) => (
@@ -1357,7 +1492,7 @@ export default function SudokuWizard() {
                 {settings.liveValidation && <InlineStat label="Mistakes" value={String(mistakeCount)} />}
               </div>
               <p className="mt-4 text-sm leading-6 text-[var(--sw-muted)]">
-                Scores, archives, and settings are tucked into your profile.
+                {isSignedIn ? "Scores and archives are tucked into your profile. Settings live in the gear." : "Guest boards do not save scores or archives. Use Log in if you want them stored."}
               </p>
             </PanelCard>
 
@@ -1381,29 +1516,30 @@ export default function SudokuWizard() {
         </div>
       </div>
 
-      <ProfileDrawer
-        open={profileOpen}
-        tab={profileTab}
-        setTab={setProfileTab}
-        onClose={() => setProfileOpen(false)}
-        isSignedIn={Boolean(isSignedIn)}
-        email={isSignedIn ? profile.email : "Guest"}
-        activeAvatar={activeAvatar}
-        onAvatarChange={updateAvatar}
-        bestTimes={bestTimes}
-        gamesCompleted={gamesCompleted}
-        archives={archives}
-        profileLoaded={profileLoaded}
-        onLoadArchive={loadArchivedPuzzle}
-        onDeleteArchive={deleteArchivedPuzzle}
+      {isSignedIn && (
+        <ProfileDrawer
+          open={profileOpen}
+          tab={profileTab}
+          setTab={setProfileTab}
+          onClose={() => setProfileOpen(false)}
+          email={profile.email}
+          activeAvatar={activeAvatar}
+          onAvatarChange={updateAvatar}
+          bestTimes={bestTimes}
+          gamesCompleted={gamesCompleted}
+          archives={archives}
+          profileLoaded={profileLoaded}
+          onLoadArchive={loadArchivedPuzzle}
+          onDeleteArchive={deleteArchivedPuzzle}
+          onLogout={handleLogout}
+          accountMessage={accountMessage}
+        />
+      )}
+      <SettingsDrawer
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
         settings={settings}
         onSettingsChange={commitSettings}
-        onLogout={handleLogout}
-        onShowAuth={() => {
-          setProfileOpen(false);
-          setAccountMode("gate");
-        }}
-        accountMessage={accountMessage}
       />
     </div>
   );
@@ -1411,6 +1547,34 @@ export default function SudokuWizard() {
 
 function completionPercent(filledCount) {
   return Math.round((filledCount / 81) * 100);
+}
+
+function AccountDataLoader({ title, detail, actionLabel, onAction }) {
+  return (
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#3a1245_0%,#17081f_45%,#050507_100%)] px-4 py-8 text-[#f6efff]">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-3xl items-center justify-center">
+        <div className="w-full rounded-[2.4rem] border border-white/10 bg-[#0f0b16]/88 p-8 text-center shadow-[0_24px_90px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+          <div className="mx-auto inline-flex rounded-[1.8rem] border border-white/10 bg-black/25 p-3">
+            <img src={wizardLogo} alt="Sudoku Wizard logo" className="h-24 w-auto" />
+          </div>
+          <div className="mx-auto mt-7 flex h-14 w-14 items-center justify-center rounded-full border border-[#f08be8]/20 bg-[#f08be8]/10">
+            <LoaderCircle className="h-7 w-7 animate-spin text-[#f3a3eb]" />
+          </div>
+          <h1 className="mt-6 text-4xl tracking-tight text-[#fbf5ff] [font-family:var(--font-display)]">{title}</h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-[#d9cce8]">{detail}</p>
+          {actionLabel && (
+            <button
+              type="button"
+              onClick={onAction}
+              className="mt-6 rounded-full border border-[#f08be8]/35 bg-[#f08be8]/14 px-5 py-3 text-sm font-semibold text-[#fbf5ff] hover:bg-[#f08be8]/22"
+            >
+              {actionLabel}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function AccountGate({ loading = false, message = "", onSignIn, onSignUp, onResetPassword, onGuest }) {
@@ -1596,7 +1760,6 @@ function ProfileDrawer({
   tab,
   setTab,
   onClose,
-  isSignedIn,
   email,
   activeAvatar,
   onAvatarChange,
@@ -1606,17 +1769,14 @@ function ProfileDrawer({
   profileLoaded,
   onLoadArchive,
   onDeleteArchive,
-  settings,
-  onSettingsChange,
   onLogout,
-  onShowAuth,
   accountMessage,
 }) {
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   const ActiveAvatarIcon = activeAvatar.icon;
   const tabs = [
     { id: "scores", label: "Scores" },
     { id: "archives", label: "Archive" },
-    { id: "settings", label: "Settings" },
   ];
 
   return (
@@ -1638,12 +1798,17 @@ function ProfileDrawer({
           >
             <div className="flex items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
-                <span className={classNames("flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br", activeAvatar.gradient)}>
+                <button
+                  type="button"
+                  onClick={() => setAvatarPickerOpen((current) => !current)}
+                  className={classNames("flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br shadow-[0_14px_30px_rgba(188,98,255,0.28)] ring-2 ring-[#f08be8]/20 transition-all duration-200 hover:scale-105 hover:ring-[#f08be8]/45", activeAvatar.gradient)}
+                  aria-label="Choose avatar"
+                >
                   <ActiveAvatarIcon className="h-7 w-7 text-white" />
-                </span>
+                </button>
                 <div className="min-w-0">
                   <div className="text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">
-                    {isSignedIn ? "Profile" : "Guest"}
+                    Profile
                   </div>
                   <div className="truncate text-sm text-[var(--sw-muted)]">{email}</div>
                 </div>
@@ -1657,7 +1822,33 @@ function ProfileDrawer({
               </button>
             </div>
 
-            <div className="mt-5 grid grid-cols-3 gap-2 rounded-full border border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] p-1">
+            <AnimatePresence>
+              {avatarPickerOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="mt-5 rounded-[1.7rem] border border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] p-4"
+                >
+                  <div className="mb-3 text-sm font-semibold text-[var(--sw-title)]">Choose avatar</div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {AVATARS.map((avatar) => (
+                      <AvatarChoice
+                        key={avatar.id}
+                        avatar={avatar}
+                        selected={avatar.id === activeAvatar.id}
+                        onClick={() => {
+                          onAvatarChange(avatar.id);
+                          setAvatarPickerOpen(false);
+                        }}
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="mt-5 grid grid-cols-2 gap-2 rounded-full border border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] p-1">
               {tabs.map((item) => (
                 <button
                   key={item.id}
@@ -1679,39 +1870,20 @@ function ProfileDrawer({
             <div className="mt-5 flex-1 overflow-y-auto pr-1">
               {tab === "scores" && (
                 <div className="space-y-5">
-                  <ProfilePanel icon={<User className="h-5 w-5 text-[#f3a3eb]" />} title="Avatar">
-                    <div className="grid grid-cols-3 gap-3">
-                      {AVATARS.map((avatar) => (
-                        <AvatarChoice
-                          key={avatar.id}
-                          avatar={avatar}
-                          selected={avatar.id === activeAvatar.id}
-                          onClick={() => onAvatarChange(avatar.id)}
-                        />
+                  <ProfilePanel icon={<Trophy className="h-5 w-5 text-[#f3a3eb]" />} title="Scores">
+                    <div className="space-y-3">
+                      <InlineStat label="Games completed" value={String(gamesCompleted)} />
+                      {Object.keys(DIFFICULTIES).map((level) => (
+                        <BestTimeRow key={level} level={level} value={bestTimes[level]} active={false} />
                       ))}
                     </div>
-                  </ProfilePanel>
-
-                  <ProfilePanel icon={<Trophy className="h-5 w-5 text-[#f3a3eb]" />} title="Scores">
-                    {isSignedIn ? (
-                      <div className="space-y-3">
-                        <InlineStat label="Games completed" value={String(gamesCompleted)} />
-                        {Object.keys(DIFFICULTIES).map((level) => (
-                          <BestTimeRow key={level} level={level} value={bestTimes[level]} active={false} />
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm leading-6 text-[var(--sw-muted)]">Guest games do not save scores. Sign in if you want best times and completed boards to follow you.</p>
-                    )}
                   </ProfilePanel>
                 </div>
               )}
 
               {tab === "archives" && (
                 <ProfilePanel icon={<Archive className="h-5 w-5 text-[#f3a3eb]" />} title={`Archive ${archives.length}/${MAX_ARCHIVES}`}>
-                  {!isSignedIn ? (
-                    <p className="text-sm leading-6 text-[var(--sw-muted)]">Archives are available after signing in.</p>
-                  ) : !profileLoaded ? (
+                  {!profileLoaded ? (
                     <p className="text-sm leading-6 text-[var(--sw-muted)]">Loading archives...</p>
                   ) : archives.length === 0 ? (
                     <p className="text-sm leading-6 text-[var(--sw-muted)]">No archived puzzles yet.</p>
@@ -1749,35 +1921,74 @@ function ProfileDrawer({
                   )}
                 </ProfilePanel>
               )}
-
-              {tab === "settings" && (
-                <ProfilePanel icon={settings.lightMode ? <Sun className="h-5 w-5 text-[#f3a3eb]" /> : <Moon className="h-5 w-5 text-[#c391ff]" />} title="Settings">
-                  <div className="space-y-3">
-                    {SETTINGS_LIST.map((item) => (
-                      <ToggleRow
-                        key={item.key}
-                        label={item.label}
-                        description={item.description}
-                        enabled={settings[item.key]}
-                        onToggle={() =>
-                          onSettingsChange((current) => ({
-                            ...current,
-                            [item.key]: !current[item.key],
-                          }))
-                        }
-                      />
-                    ))}
-                  </div>
-                </ProfilePanel>
-              )}
             </div>
 
             <div className="mt-5 border-t border-[var(--sw-border-soft)] pt-4">
-              {isSignedIn ? (
-                <UtilityButton icon={<LogOut className="h-4 w-4" />} label="Logout" onClick={onLogout} fullWidth />
-              ) : (
-                <UtilityButton icon={<CircleUserRound className="h-4 w-4" />} label="Sign in or sign up" onClick={onShowAuth} fullWidth />
-              )}
+              <UtilityButton icon={<LogOut className="h-4 w-4" />} label="Logout" onClick={onLogout} fullWidth />
+            </div>
+          </motion.aside>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function SettingsDrawer({ open, onClose, settings, onSettingsChange }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm"
+        >
+          <button type="button" aria-label="Close settings" className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} />
+          <motion.aside
+            initial={{ x: 420 }}
+            animate={{ x: 0 }}
+            exit={{ x: 420 }}
+            transition={{ type: "spring", damping: 28, stiffness: 230 }}
+            className="absolute right-0 top-0 flex h-full w-full max-w-[430px] flex-col border-l border-[var(--sw-border)] bg-[var(--sw-panel-strong)] p-5 shadow-[var(--sw-shadow)] backdrop-blur-2xl"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[#f08be8]/25 bg-[#f08be8]/12 text-[#f3a3eb]">
+                  {settings.lightMode ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
+                </span>
+                <div>
+                  <div className="text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">Settings</div>
+                  <div className="text-sm text-[var(--sw-muted)]">Board and theme controls</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full border border-[var(--sw-border)] bg-[var(--sw-panel-soft)] p-2 text-[var(--sw-text)] hover:bg-[var(--sw-panel-hover)]"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-6 flex-1 overflow-y-auto pr-1">
+              <ProfilePanel icon={<Settings className="h-5 w-5 text-[#f3a3eb]" />} title="Settings">
+                <div className="space-y-3">
+                  {SETTINGS_LIST.map((item) => (
+                    <ToggleRow
+                      key={item.key}
+                      label={item.label}
+                      description={item.description}
+                      enabled={settings[item.key]}
+                      onToggle={() =>
+                        onSettingsChange((current) => ({
+                          ...current,
+                          [item.key]: !current[item.key],
+                        }))
+                      }
+                    />
+                  ))}
+                </div>
+              </ProfilePanel>
             </div>
           </motion.aside>
         </motion.div>
