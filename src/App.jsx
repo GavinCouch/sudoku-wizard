@@ -209,7 +209,95 @@ function normalizeProfile(data, user) {
     settings: { ...DEFAULT_SETTINGS, ...(data?.settings ?? {}) },
     bestTimes: data?.bestTimes && typeof data.bestTimes === "object" ? data.bestTimes : {},
     gamesCompleted: Number.isFinite(data?.gamesCompleted) ? data.gamesCompleted : 0,
-    archives: Array.isArray(data?.archives) ? data.archives.slice(0, MAX_ARCHIVES) : [],
+    archives: Array.isArray(data?.archives)
+      ? data.archives.map(deserializeArchive).filter(Boolean).slice(0, MAX_ARCHIVES)
+      : [],
+  };
+}
+
+function encodeNumberGrid(grid) {
+  return grid.map((row) => row.join(""));
+}
+
+function decodeNumberGrid(rows) {
+  return rows.map((row) => String(row).padEnd(9, "0").slice(0, 9).split("").map(Number));
+}
+
+function encodeBooleanGrid(grid) {
+  return grid.map((row) => row.map((value) => (value ? "1" : "0")).join(""));
+}
+
+function decodeBooleanGrid(rows) {
+  return rows.map((row) => String(row).padEnd(9, "0").slice(0, 9).split("").map((value) => value === "1"));
+}
+
+function encodeNotesGrid(notes) {
+  return notes.flatMap((row) => row.map((cell) => cell.join("")));
+}
+
+function decodeNotesGrid(cells) {
+  return Array.from({ length: 9 }, (_, r) =>
+    Array.from({ length: 9 }, (_, c) =>
+      String(cells[r * 9 + c] ?? "")
+        .split("")
+        .map(Number)
+        .filter((value) => value >= 1 && value <= 9)
+    )
+  );
+}
+
+function serializeArchive(archive) {
+  return {
+    id: archive.id,
+    name: archive.name,
+    archivedAt: archive.archivedAt,
+    difficulty: archive.difficulty,
+    puzzleRows: encodeNumberGrid(archive.puzzleData.puzzle),
+    solutionRows: encodeNumberGrid(archive.puzzleData.solution),
+    fixedRows: encodeBooleanGrid(archive.puzzleData.fixed),
+    boardRows: encodeNumberGrid(archive.board),
+    noteCells: encodeNotesGrid(archive.notes),
+    seconds: archive.seconds,
+    mistakeCount: archive.mistakeCount,
+    hintCount: archive.hintCount,
+    noteMode: archive.noteMode,
+  };
+}
+
+function deserializeArchive(archive) {
+  if (!archive?.id) return null;
+
+  const puzzleRows = archive.puzzleRows ?? archive.puzzleData?.puzzle;
+  const solutionRows = archive.solutionRows ?? archive.puzzleData?.solution;
+  const fixedRows = archive.fixedRows ?? archive.puzzleData?.fixed;
+  const boardRows = archive.boardRows ?? archive.board;
+  const noteCells = archive.noteCells ?? archive.notes;
+
+  if (!puzzleRows || !solutionRows || !fixedRows || !boardRows) return null;
+
+  return {
+    id: archive.id,
+    name: archive.name ?? "Archived puzzle",
+    archivedAt: archive.archivedAt ?? new Date().toISOString(),
+    difficulty: archive.difficulty ?? "Easy",
+    puzzleData: {
+      puzzle: Array.isArray(puzzleRows[0]) ? puzzleRows : decodeNumberGrid(puzzleRows),
+      solution: Array.isArray(solutionRows[0]) ? solutionRows : decodeNumberGrid(solutionRows),
+      fixed: Array.isArray(fixedRows[0]) ? fixedRows : decodeBooleanGrid(fixedRows),
+    },
+    board: Array.isArray(boardRows[0]) ? boardRows : decodeNumberGrid(boardRows),
+    notes: Array.isArray(noteCells?.[0]) ? noteCells : decodeNotesGrid(noteCells ?? []),
+    seconds: archive.seconds ?? 0,
+    mistakeCount: archive.mistakeCount ?? 0,
+    hintCount: archive.hintCount ?? 0,
+    noteMode: Boolean(archive.noteMode),
+  };
+}
+
+function prepareProfilePatch(patch) {
+  return {
+    ...patch,
+    ...(patch.archives ? { archives: patch.archives.map(serializeArchive) } : {}),
   };
 }
 
@@ -289,6 +377,7 @@ export default function SudokuWizard() {
   const [timerLocked, setTimerLocked] = useState(false);
   const [archivedPuzzleId, setArchivedPuzzleId] = useState(null);
   const [completionRecorded, setCompletionRecorded] = useState(false);
+  const [archiveSaving, setArchiveSaving] = useState(false);
   const [board, setBoard] = useState(puzzleData.puzzle);
   const [notes, setNotes] = useState(createEmptyNotes);
 
@@ -373,31 +462,37 @@ export default function SudokuWizard() {
     ? `Solved${settings.timerEnabled && !timerLocked ? ` in ${formatTime(seconds)}` : ""}${timerLocked ? ", not eligible for a best time" : ""}${hintCount ? ` with ${hintCount} hint${hintCount === 1 ? "" : "s"}` : ""}.`
     : null;
 
-  function saveProfilePatch(patch) {
-    if (!authUser || !db) return;
+  async function saveProfilePatch(patch) {
+    if (!authUser || !db) return false;
 
-    setDoc(
-      doc(db, "users", authUser.uid),
-      {
-        ...patch,
-        email: authUser.email ?? profile.email,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    ).catch((error) => setAccountMessage(authErrorMessage(error)));
+    try {
+      await setDoc(
+        doc(db, "users", authUser.uid),
+        {
+          ...prepareProfilePatch(patch),
+          email: authUser.email ?? profile.email,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return true;
+    } catch (error) {
+      setAccountMessage(authErrorMessage(error));
+      return false;
+    }
   }
 
   function commitSettings(updater) {
     setSettings((current) => {
       const next = typeof updater === "function" ? updater(current) : updater;
-      if (isSignedIn) saveProfilePatch({ settings: next });
+      if (isSignedIn) void saveProfilePatch({ settings: next });
       return next;
     });
   }
 
   function updateAvatar(avatarId) {
     setProfile((current) => ({ ...current, avatarId }));
-    if (isSignedIn) saveProfilePatch({ avatarId });
+    if (isSignedIn) void saveProfilePatch({ avatarId });
   }
 
   async function handleSignIn(email, password) {
@@ -476,7 +571,7 @@ export default function SudokuWizard() {
       setArchivedPuzzleId(null);
     }
 
-    saveProfilePatch(patch);
+    void saveProfilePatch(patch);
   }
 
   function createArchiveSnapshot(id, name) {
@@ -495,8 +590,8 @@ export default function SudokuWizard() {
     };
   }
 
-  function archiveCurrentPuzzle() {
-    if (!isSignedIn || completed) return;
+  async function archiveCurrentPuzzle() {
+    if (!isSignedIn || completed || archiveSaving) return;
 
     const existingArchive = archives.find((archive) => archive.id === archivedPuzzleId);
     if (!existingArchive && archives.length >= MAX_ARCHIVES) {
@@ -513,11 +608,22 @@ export default function SudokuWizard() {
       ? archives.map((archive) => (archive.id === id ? snapshot : archive))
       : [snapshot, ...archives].slice(0, MAX_ARCHIVES);
 
-    setArchives(nextArchives);
-    setArchivedPuzzleId(id);
-    setTimerLocked(true);
-    setAccountMessage("Puzzle archived. Timer and best-time eligibility are off for this board.");
-    saveProfilePatch({ archives: nextArchives });
+    setArchiveSaving(true);
+    setAccountMessage("");
+
+    const saved = await saveProfilePatch({ archives: nextArchives });
+
+    if (saved) {
+      setArchives(nextArchives);
+      setArchivedPuzzleId(id);
+      setTimerLocked(true);
+      setAccountMessage("Puzzle archived. Timer and best-time eligibility are off for this board.");
+    } else {
+      setProfileOpen(true);
+      setProfileTab("archives");
+    }
+
+    setArchiveSaving(false);
   }
 
   function loadArchivedPuzzle(archive) {
@@ -538,11 +644,22 @@ export default function SudokuWizard() {
     setProfileOpen(false);
   }
 
-  function deleteArchivedPuzzle(archiveId) {
+  async function deleteArchivedPuzzle(archiveId) {
+    if (archiveSaving) return;
+
     const nextArchives = archives.filter((archive) => archive.id !== archiveId);
-    setArchives(nextArchives);
-    if (archivedPuzzleId === archiveId) setArchivedPuzzleId(null);
-    if (isSignedIn) saveProfilePatch({ archives: nextArchives });
+    setArchiveSaving(true);
+    const saved = isSignedIn ? await saveProfilePatch({ archives: nextArchives }) : true;
+
+    if (saved) {
+      setArchives(nextArchives);
+      if (archivedPuzzleId === archiveId) setArchivedPuzzleId(null);
+    } else {
+      setProfileOpen(true);
+      setProfileTab("archives");
+    }
+
+    setArchiveSaving(false);
   }
 
   function triggerFeedback(key, type) {
@@ -889,9 +1006,9 @@ export default function SudokuWizard() {
                 {isSignedIn && (
                   <UtilityButton
                     icon={<Archive className="h-4 w-4" />}
-                    label={archivedPuzzleId ? "Update archive" : `Archive ${archives.length}/${MAX_ARCHIVES}`}
+                    label={archiveSaving ? "Saving..." : archivedPuzzleId ? "Update archive" : `Archive ${archives.length}/${MAX_ARCHIVES}`}
                     onClick={archiveCurrentPuzzle}
-                    disabled={completed || (!archivedPuzzleId && archives.length >= MAX_ARCHIVES)}
+                    disabled={archiveSaving || completed || (!archivedPuzzleId && archives.length >= MAX_ARCHIVES)}
                   />
                 )}
                 {!showResetConfirm && (
