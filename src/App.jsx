@@ -531,12 +531,13 @@ export default function SudokuWizard() {
     if (!audio) return;
 
     audio.volume = normalizeLofiVolume(volume) / 100;
+    setLofiStatus("Connecting...");
 
     try {
       await audio.play();
       setLofiStatus("Streaming lofi hip hop");
     } catch {
-      setLofiStatus("Playback was blocked. Toggle lofi off and on once.");
+      setLofiStatus("Playback needs a tap. Press Play.");
     }
   }
 
@@ -702,12 +703,7 @@ export default function SudokuWizard() {
 
     if (!settings.lofiEnabled) {
       audio.pause();
-      return;
     }
-
-    void audio.play().catch(() => {
-      setLofiStatus("Playback was blocked. Toggle lofi off and on once.");
-    });
   }, [lofiVolume, settings.lofiEnabled]);
 
   const selectedValue = selected.r !== null && selected.c !== null ? board[selected.r][selected.c] : null;
@@ -1621,6 +1617,7 @@ export default function SudokuWizard() {
         onSettingsChange={commitSettings}
         onLofiEnabledChange={setLofiEnabled}
         onLofiVolumeChange={setLofiVolume}
+        onLofiPlay={() => playLofiStream()}
         lofiStatus={lofiStatus}
       />
       <audio
@@ -2023,7 +2020,7 @@ function ProfileDrawer({
   );
 }
 
-function SettingsDrawer({ open, onClose, settings, onSettingsChange, onLofiEnabledChange, onLofiVolumeChange, lofiStatus }) {
+function SettingsDrawer({ open, onClose, settings, onSettingsChange, onLofiEnabledChange, onLofiVolumeChange, onLofiPlay, lofiStatus }) {
   return (
     <AnimatePresence>
       {open && (
@@ -2086,6 +2083,7 @@ function SettingsDrawer({ open, onClose, settings, onSettingsChange, onLofiEnabl
                           volume={settings.lofiVolume}
                           status={lofiStatus}
                           onChange={onLofiVolumeChange}
+                          onPlay={onLofiPlay}
                         />
                       )}
                     </div>
@@ -2100,8 +2098,9 @@ function SettingsDrawer({ open, onClose, settings, onSettingsChange, onLofiEnabl
   );
 }
 
-function LofiVolumeControl({ volume, status, onChange }) {
+function LofiVolumeControl({ volume, status, onChange, onPlay }) {
   const safeVolume = normalizeLofiVolume(volume);
+  const streamActive = status === "Streaming lofi hip hop";
 
   return (
     <div className="mt-3 rounded-[1.25rem] border border-[#f08be8]/25 bg-[#f08be8]/10 p-4">
@@ -2121,7 +2120,19 @@ function LofiVolumeControl({ volume, status, onChange }) {
         onChange={(event) => onChange(event.target.value)}
         className="mt-4 w-full accent-[#f08be8]"
       />
-      <div className="mt-2 text-xs leading-5 text-[var(--sw-muted)]">{status}</div>
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-xs leading-5 text-[var(--sw-muted)]">
+          {status === "Off" ? "Press Play to start the stream." : status}
+        </div>
+        <button
+          type="button"
+          onClick={onPlay}
+          className="inline-flex items-center justify-center gap-2 rounded-full border border-[#f08be8]/35 bg-[#f08be8]/14 px-3 py-2 text-xs font-semibold text-[var(--sw-title)] transition-all duration-200 hover:bg-[#f08be8]/22"
+        >
+          <PlayCircle className="h-3.5 w-3.5" />
+          {streamActive ? "Restart" : "Play"}
+        </button>
+      </div>
     </div>
   );
 }
