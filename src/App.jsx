@@ -254,6 +254,18 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function authErrorMessage(error) {
+  if (error?.code === "auth/configuration-not-found" || error?.message?.includes("CONFIGURATION_NOT_FOUND")) {
+    return "Firebase Authentication is not enabled for this project yet. Enable Authentication and the Email/Password provider in Firebase Console.";
+  }
+
+  if (error?.code === "auth/operation-not-allowed") {
+    return "Email/password sign-in is not enabled yet in Firebase Authentication.";
+  }
+
+  return error?.message ?? "Something went wrong.";
+}
+
 export default function SudokuWizard() {
   const [accountMode, setAccountMode] = useState(firebaseReady ? "loading" : "gate");
   const [authUser, setAuthUser] = useState(null);
@@ -329,7 +341,7 @@ export default function SudokuWizard() {
         updatedAt: serverTimestamp(),
       },
       { merge: true }
-    ).catch((error) => setAccountMessage(error.message));
+    ).catch((error) => setAccountMessage(authErrorMessage(error)));
 
     return onSnapshot(
       profileRef,
@@ -341,7 +353,7 @@ export default function SudokuWizard() {
         setGamesCompleted(nextProfile.gamesCompleted);
         setArchives(nextProfile.archives);
       },
-      (error) => setAccountMessage(error.message)
+      (error) => setAccountMessage(authErrorMessage(error))
     );
   }, [authUser]);
 
@@ -372,7 +384,7 @@ export default function SudokuWizard() {
         updatedAt: serverTimestamp(),
       },
       { merge: true }
-    ).catch((error) => setAccountMessage(error.message));
+    ).catch((error) => setAccountMessage(authErrorMessage(error)));
   }
 
   function commitSettings(updater) {
@@ -1178,7 +1190,7 @@ function AccountGate({ loading = false, message = "", onSignIn, onSignUp, onRese
         await onSignIn(email, password);
       }
     } catch (error) {
-      setLocalMessage(error.message);
+      setLocalMessage(authErrorMessage(error));
     } finally {
       setBusy(false);
     }
