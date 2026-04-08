@@ -1,4 +1,4 @@
-import React, { useEffect, useEffectEvent, useMemo, useState } from "react";
+import React, { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import wizardLogo from "../sw_logo.png";
 import {
@@ -39,7 +39,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { deleteField, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, firebaseReady } from "./firebase";
 
 const MotionHeader = motion.header;
@@ -202,6 +202,11 @@ function createDefaultProfile(email = "") {
 function normalizeProfile(data, user) {
   const profile = createDefaultProfile(user?.email ?? "");
   const avatarExists = AVATARS.some((avatar) => avatar.id === data?.avatarId);
+  const archiveValues = [
+    ...Object.values(data?.archivesById ?? {}),
+    ...(Array.isArray(data?.archives) ? data.archives : []),
+  ];
+  const archiveIds = new Set();
 
   return {
     email: data?.email ?? profile.email,
@@ -209,9 +214,14 @@ function normalizeProfile(data, user) {
     settings: { ...DEFAULT_SETTINGS, ...(data?.settings ?? {}) },
     bestTimes: data?.bestTimes && typeof data.bestTimes === "object" ? data.bestTimes : {},
     gamesCompleted: Number.isFinite(data?.gamesCompleted) ? data.gamesCompleted : 0,
-    archives: Array.isArray(data?.archives)
-      ? data.archives.map(deserializeArchive).filter(Boolean).slice(0, MAX_ARCHIVES)
-      : [],
+    archives: archiveValues
+      .map(deserializeArchive)
+      .filter((archive) => {
+        if (!archive || archiveIds.has(archive.id)) return false;
+        archiveIds.add(archive.id);
+        return true;
+      })
+      .slice(0, MAX_ARCHIVES),
   };
 }
 
@@ -294,13 +304,6 @@ function deserializeArchive(archive) {
   };
 }
 
-function prepareProfilePatch(patch) {
-  return {
-    ...patch,
-    ...(patch.archives ? { archives: patch.archives.map(serializeArchive) } : {}),
-  };
-}
-
 function getBoxIndex(r, c) {
   return Math.floor(r / 3) * 3 + Math.floor(c / 3);
 }
@@ -357,6 +360,8 @@ function authErrorMessage(error) {
 export default function SudokuWizard() {
   const [accountMode, setAccountMode] = useState(firebaseReady ? "loading" : "gate");
   const [authUser, setAuthUser] = useState(null);
+  const legacyArchivesMigrated = useRef(false);
+  const [profileLoaded, setProfileLoaded] = useState(!firebaseReady);
   const [accountMessage, setAccountMessage] = useState(firebaseReady ? "" : "Firebase is not configured yet.");
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileTab, setProfileTab] = useState("scores");
@@ -403,11 +408,13 @@ export default function SudokuWizard() {
     if (!firebaseReady || !auth) return undefined;
 
     return onAuthStateChanged(auth, (user) => {
+      legacyArchivesMigrated.current = false;
       setAuthUser(user);
 
       if (user) {
         setAccountMode("user");
         setAccountMessage("");
+        setProfileLoaded(false);
         return;
       }
 
@@ -415,6 +422,7 @@ export default function SudokuWizard() {
       setBestTimes({});
       setGamesCompleted(0);
       setArchives([]);
+      setProfileLoaded(true);
       setAccountMode((current) => (current === "guest" ? "guest" : "gate"));
     });
   }, []);
@@ -434,13 +442,28 @@ export default function SudokuWizard() {
 
     return onSnapshot(
       profileRef,
+      { includeMetadataChanges: true },
       (snapshot) => {
-        const nextProfile = normalizeProfile(snapshot.data(), authUser);
+        const snapshotData = snapshot.data();
+        const nextProfile = normalizeProfile(snapshotData, authUser);
+        if (!snapshot.metadata.fromCache) setProfileLoaded(true);
         setProfile(nextProfile);
         setSettings(nextProfile.settings);
         setBestTimes(nextProfile.bestTimes);
         setGamesCompleted(nextProfile.gamesCompleted);
         setArchives(nextProfile.archives);
+
+        if (!legacyArchivesMigrated.current && Array.isArray(snapshotData?.archives) && snapshotData.archives.length > 0) {
+          legacyArchivesMigrated.current = true;
+          const archivePatch = Object.fromEntries(
+            nextProfile.archives.map((archive) => [`archivesById.${archive.id}`, serializeArchive(archive)])
+          );
+          updateDoc(profileRef, {
+            ...archivePatch,
+            archives: deleteField(),
+            updatedAt: serverTimestamp(),
+          }).catch((error) => setAccountMessage(authErrorMessage(error)));
+        }
       },
       (error) => setAccountMessage(authErrorMessage(error))
     );
@@ -469,12 +492,51 @@ export default function SudokuWizard() {
       await setDoc(
         doc(db, "users", authUser.uid),
         {
-          ...prepareProfilePatch(patch),
+          ...patch,
           email: authUser.email ?? profile.email,
           updatedAt: serverTimestamp(),
         },
         { merge: true }
       );
+      return true;
+    } catch (error) {
+      setAccountMessage(authErrorMessage(error));
+      return false;
+    }
+  }
+
+  async function saveArchive(archive) {
+    if (!authUser || !db) return false;
+
+    try {
+      const profileRef = doc(db, "users", authUser.uid);
+      await setDoc(
+        profileRef,
+        {
+          email: authUser.email ?? profile.email,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      await updateDoc(profileRef, {
+        [`archivesById.${archive.id}`]: serializeArchive(archive),
+        updatedAt: serverTimestamp(),
+      });
+      return true;
+    } catch (error) {
+      setAccountMessage(authErrorMessage(error));
+      return false;
+    }
+  }
+
+  async function removeArchive(archiveId) {
+    if (!authUser || !db) return false;
+
+    try {
+      await updateDoc(doc(db, "users", authUser.uid), {
+        [`archivesById.${archiveId}`]: deleteField(),
+        updatedAt: serverTimestamp(),
+      });
       return true;
     } catch (error) {
       setAccountMessage(authErrorMessage(error));
@@ -513,7 +575,7 @@ export default function SudokuWizard() {
         settings,
         bestTimes: {},
         gamesCompleted: 0,
-        archives: [],
+        archivesById: {},
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       },
@@ -566,8 +628,8 @@ export default function SudokuWizard() {
 
     if (archivedPuzzleId) {
       const nextArchives = archives.filter((archive) => archive.id !== archivedPuzzleId);
-      patch.archives = nextArchives;
       setArchives(nextArchives);
+      void removeArchive(archivedPuzzleId);
       setArchivedPuzzleId(null);
     }
 
@@ -611,7 +673,7 @@ export default function SudokuWizard() {
     setArchiveSaving(true);
     setAccountMessage("");
 
-    const saved = await saveProfilePatch({ archives: nextArchives });
+    const saved = await saveArchive(snapshot);
 
     if (saved) {
       setArchives(nextArchives);
@@ -649,7 +711,7 @@ export default function SudokuWizard() {
 
     const nextArchives = archives.filter((archive) => archive.id !== archiveId);
     setArchiveSaving(true);
-    const saved = isSignedIn ? await saveProfilePatch({ archives: nextArchives }) : true;
+    const saved = isSignedIn ? await removeArchive(archiveId) : true;
 
     if (saved) {
       setArchives(nextArchives);
@@ -1255,6 +1317,7 @@ export default function SudokuWizard() {
         bestTimes={bestTimes}
         gamesCompleted={gamesCompleted}
         archives={archives}
+        profileLoaded={profileLoaded}
         onLoadArchive={loadArchivedPuzzle}
         onDeleteArchive={deleteArchivedPuzzle}
         settings={settings}
@@ -1464,6 +1527,7 @@ function ProfileDrawer({
   bestTimes,
   gamesCompleted,
   archives,
+  profileLoaded,
   onLoadArchive,
   onDeleteArchive,
   settings,
@@ -1571,6 +1635,8 @@ function ProfileDrawer({
                 <ProfilePanel icon={<Archive className="h-5 w-5 text-[#f3a3eb]" />} title={`Archive ${archives.length}/${MAX_ARCHIVES}`}>
                   {!isSignedIn ? (
                     <p className="text-sm leading-6 text-[#c8bdd6]">Archives are available after signing in.</p>
+                  ) : !profileLoaded ? (
+                    <p className="text-sm leading-6 text-[#c8bdd6]">Loading archives...</p>
                   ) : archives.length === 0 ? (
                     <p className="text-sm leading-6 text-[#c8bdd6]">No archived puzzles yet.</p>
                   ) : (
