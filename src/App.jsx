@@ -697,6 +697,26 @@ function findHintTarget(board, fixed, selected) {
   return null;
 }
 
+function findConflictingValueCells(board, r, c, num) {
+  const keys = new Set();
+
+  for (let index = 0; index < 9; index += 1) {
+    if (board[r][index] === num) keys.add(`${r}-${index}`);
+    if (board[index][c] === num) keys.add(`${index}-${c}`);
+  }
+
+  const boxRow = Math.floor(r / 3) * 3;
+  const boxCol = Math.floor(c / 3) * 3;
+  for (let row = boxRow; row < boxRow + 3; row += 1) {
+    for (let col = boxCol; col < boxCol + 3; col += 1) {
+      if (board[row][col] === num) keys.add(`${row}-${col}`);
+    }
+  }
+
+  keys.delete(`${r}-${c}`);
+  return [...keys];
+}
+
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
 }
@@ -1289,24 +1309,58 @@ export default function SudokuWizard() {
     setArchiveSaving(false);
   }
 
-  function triggerFeedback(key, type) {
+  function triggerFeedback(key, type, duration = type === "wrong" ? 420 : 520) {
     setFeedbackCells((current) => ({ ...current, [key]: type }));
     window.setTimeout(() => {
       setFeedbackCells((current) => {
         const next = { ...current };
-        delete next[key];
+        if (next[key] === type) delete next[key];
         return next;
       });
-    }, type === "wrong" ? 420 : 520);
+    }, duration);
+  }
+
+  function triggerFeedbackGroup(keys, type, duration = 520) {
+    if (keys.length === 0) return;
+
+    setFeedbackCells((current) => ({
+      ...current,
+      ...Object.fromEntries(keys.map((key) => [key, type])),
+    }));
+
+    window.setTimeout(() => {
+      setFeedbackCells((current) => {
+        const next = { ...current };
+        for (const key of keys) {
+          if (next[key] === type) delete next[key];
+        }
+        return next;
+      });
+    }, duration);
   }
 
   function toggleNoteValue(r, c, num) {
+    const cellNotes = notes[r][c];
+
+    if (cellNotes.includes(num)) {
+      setNotes((current) => {
+        const next = copyNotes(current);
+        next[r][c] = next[r][c].filter((value) => value !== num);
+        return next;
+      });
+      return;
+    }
+
+    const conflictingCells = findConflictingValueCells(board, r, c, num);
+    if (conflictingCells.length > 0) {
+      triggerFeedback(`${r}-${c}`, "note-blocked", 430);
+      triggerFeedbackGroup(conflictingCells, "note-conflict", 520);
+      return;
+    }
+
     setNotes((current) => {
       const next = copyNotes(current);
-      const cellNotes = next[r][c];
-      next[r][c] = cellNotes.includes(num)
-        ? cellNotes.filter((value) => value !== num)
-        : [...cellNotes, num].sort((a, b) => a - b);
+      next[r][c] = [...next[r][c], num].sort((a, b) => a - b);
       return next;
     });
   }
@@ -1744,6 +1798,8 @@ export default function SudokuWizard() {
                         const feedbackType = feedbackCells[key];
                         const correctPulse = feedbackType === "correct";
                         const wrongPulse = feedbackType === "wrong";
+                        const noteBlockedPulse = feedbackType === "note-blocked";
+                        const noteConflictPulse = feedbackType === "note-conflict";
                         const wrong = settings.liveValidation && !fixed && value !== 0 && value !== puzzleData.solution[r][c];
                         const noteValues = notes[r][c];
                         let backgroundColor = fixed ? boardColors.fixed : boardColors.open;
@@ -1775,6 +1831,12 @@ export default function SudokuWizard() {
                           shadowLayers.push("inset 0 0 0 2px rgba(245,96,145,0.35)");
                         }
 
+                        if (noteConflictPulse || noteBlockedPulse) {
+                          backgroundColor = boardColors.wrong;
+                          textColor = fixed ? boardColors.fixedText : value === 0 ? boardColors.noteText : boardColors.userText;
+                          shadowLayers.push("inset 0 0 0 2px rgba(245,96,145,0.62)");
+                        }
+
                         if (isSelected) {
                           shadowLayers.push("inset 0 0 0 2px rgba(242,124,225,0.88)");
                         }
@@ -1797,11 +1859,15 @@ export default function SudokuWizard() {
                             key={key}
                             type="button"
                             animate={
-                              wrongPulse
+                              noteBlockedPulse
+                                ? { x: [0, -3, 3, -2, 2, 0], transition: { duration: 0.34 } }
+                                : wrongPulse
                                 ? { opacity: [1, 0.82, 1, 0.88, 1], transition: { duration: 0.34 } }
+                                : noteConflictPulse
+                                  ? { filter: ["brightness(1)", "brightness(1.15)", "brightness(1)"], transition: { duration: 0.32 } }
                                 : correctPulse
                                   ? { filter: ["brightness(1)", "brightness(1.22)", "brightness(1)"], transition: { duration: 0.3 } }
-                                  : { opacity: 1, filter: "brightness(1)" }
+                                  : { x: 0, opacity: 1, filter: "brightness(1)" }
                             }
                             onClick={() => setSelected({ r, c })}
                             style={cellBorderStyle}
@@ -1824,6 +1890,14 @@ export default function SudokuWizard() {
                                 animate={{ opacity: 0, scale: 1 }}
                                 transition={{ duration: 0.32 }}
                                 className="pointer-events-none absolute inset-0 bg-[#f35e92]/28 ring-2 ring-inset ring-[#ff8eb7]"
+                              />
+                            )}
+                            {(noteBlockedPulse || noteConflictPulse) && (
+                              <motion.span
+                                initial={{ opacity: 0.72, scale: 1 }}
+                                animate={{ opacity: 0, scale: 1 }}
+                                transition={{ duration: noteBlockedPulse ? 0.38 : 0.32 }}
+                                className="pointer-events-none absolute inset-0 bg-[#f35e92]/32 ring-2 ring-inset ring-[#ff7fb0]"
                               />
                             )}
 
