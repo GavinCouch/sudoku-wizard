@@ -1688,6 +1688,10 @@ export default function SudokuWizard() {
 
   async function archiveCurrentPuzzle() {
     if (!isSignedIn || boardLocked || archiveSaving) return;
+    if (isWizardMode) {
+      setAccountMessage("Wizard boards cannot be archived.");
+      return;
+    }
 
     const existingArchive = archives.find((archive) => archive.id === archivedPuzzleId);
     if (!existingArchive && archives.length >= MAX_ARCHIVES) {
@@ -2191,7 +2195,7 @@ export default function SudokuWizard() {
                     puzzleData.fixed[selected.r][selected.c]
                   }
                 />
-                {isSignedIn && (
+                {isSignedIn && !isWizardMode && (
                   <UtilityButton
                     icon={<Archive className="h-4 w-4" />}
                     label={archiveSaving ? "Saving..." : archivedPuzzleId ? "Update archive" : `Archive ${archives.length}/${MAX_ARCHIVES}`}
@@ -2427,7 +2431,11 @@ export default function SudokuWizard() {
                 {showMistakeRules && <InlineStat label="Mistakes" value={mistakeMetricValue} />}
               </div>
               <p className="mt-4 text-sm leading-6 text-[var(--sw-muted)]">
-                {isSignedIn ? "Scores and archives are tucked into your profile. Settings live in the gear." : "Guest boards do not save scores or archives. Use Log in if you want them stored."}
+                {isSignedIn
+                  ? isWizardMode
+                    ? "Wizard boards never allow archives. Scores stay in your profile, and settings live in the gear."
+                    : "Scores and archives are tucked into your profile. Settings live in the gear."
+                  : "Guest boards do not save scores or archives. Use Log in if you want them stored."}
               </p>
             </PanelCard>
 
