@@ -2198,7 +2198,6 @@ export default function SudokuWizard() {
                       wizardButton && active && "wizard-mode-button-active"
                     )}
                   >
-                    {wizardButton && active && <span aria-hidden="true" className="wizard-mode-button-fill" />}
                     <span
                       className={classNames(
                         "relative z-10 block text-[0.98rem] font-semibold leading-none tracking-[-0.035em] sm:text-[1.08rem]",
