@@ -1239,8 +1239,8 @@ export default function SudokuWizard() {
     ...themeVars,
     background: isWizardMode
       ? settings.lightMode
-        ? "radial-gradient(circle at 14% 0%, rgba(255, 149, 228, 0.58) 0%, transparent 28%), radial-gradient(circle at 85% 16%, rgba(155, 111, 255, 0.38) 0%, transparent 34%), radial-gradient(circle at 45% 92%, rgba(255, 223, 245, 0.62) 0%, transparent 38%), linear-gradient(135deg, #fffaff 0%, #f5eefc 42%, #e4dcf2 100%)"
-        : "radial-gradient(circle at 14% 0%, rgba(255, 111, 215, 0.28) 0%, transparent 28%), radial-gradient(circle at 85% 16%, rgba(114, 84, 255, 0.24) 0%, transparent 34%), radial-gradient(circle at 45% 92%, rgba(255, 175, 233, 0.18) 0%, transparent 38%), linear-gradient(135deg, #1e0e28 0%, #0f0717 52%, #030305 100%)"
+        ? "radial-gradient(circle at 18% 16%, rgba(255, 173, 234, 0.52) 0%, transparent 34%), radial-gradient(circle at 82% 20%, rgba(170, 126, 255, 0.34) 0%, transparent 36%), radial-gradient(circle at 52% 76%, rgba(255, 248, 252, 0.54) 0%, transparent 40%), linear-gradient(155deg, #fffaff 0%, #f7eefc 42%, #e7dcf3 100%)"
+        : "radial-gradient(circle at 18% 16%, rgba(255, 118, 216, 0.26) 0%, transparent 34%), radial-gradient(circle at 82% 20%, rgba(123, 91, 255, 0.22) 0%, transparent 36%), radial-gradient(circle at 52% 76%, rgba(255, 188, 236, 0.12) 0%, transparent 40%), linear-gradient(155deg, #24102e 0%, #120818 44%, #040406 100%)"
       : settings.lightMode
         ? "radial-gradient(circle at 12% -10%, rgba(255, 147, 228, 0.52) 0%, transparent 34%), radial-gradient(circle at 88% 8%, rgba(156, 98, 255, 0.34) 0%, transparent 32%), linear-gradient(135deg, #fff6fd 0%, #eee8f5 48%, #d6d1dc 100%)"
         : "radial-gradient(circle at top left, #3a1245 0%, #17081f 45%, #050507 100%)",
@@ -2028,22 +2028,27 @@ export default function SudokuWizard() {
       style={pageStyle}
       className="min-h-screen overflow-hidden transition-colors duration-500"
     >
-      <div className="pointer-events-none absolute inset-0 opacity-80">
-        {isWizardMode && (
-          <div className={classNames("wizard-sky", settings.lightMode ? "wizard-sky-light" : "wizard-sky-dark")} />
-        )}
-        <div className="absolute -left-12 top-0 h-72 w-72 rounded-full bg-[#ff74d9]/22 blur-3xl" />
-        <div className="absolute right-0 top-40 h-80 w-80 rounded-full bg-[#8d5bff]/18 blur-3xl" />
-        <div className={classNames("absolute bottom-0 left-1/3 h-72 w-72 rounded-full blur-3xl", settings.lightMode ? "bg-[#2b2433]/10" : "bg-[#9590a8]/10")} />
-        {settings.lightMode && (
-          <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.65)_0%,transparent_100%)]" />
-        )}
-        {isWizardMode && (
-          <>
-            <div className={classNames("wizard-aura wizard-aura-one", settings.lightMode ? "wizard-aura-light" : "wizard-aura-dark")} />
-            <div className={classNames("wizard-aura wizard-aura-two", settings.lightMode ? "wizard-aura-light" : "wizard-aura-dark")} />
-            <div className={classNames("wizard-aura wizard-aura-three", settings.lightMode ? "wizard-aura-light" : "wizard-aura-dark")} />
-          </>
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {isWizardMode ? (
+          <div className={classNames("wizard-lava-stage", settings.lightMode ? "wizard-lava-stage-light" : "wizard-lava-stage-dark")}>
+            <div className="wizard-lava-blob wizard-lava-blob-one" />
+            <div className="wizard-lava-blob wizard-lava-blob-two" />
+            <div className="wizard-lava-blob wizard-lava-blob-three" />
+            <div className="wizard-lava-blob wizard-lava-blob-four" />
+            <div className="wizard-lava-blob wizard-lava-blob-five" />
+            <div className="wizard-lava-wave wizard-lava-wave-one" />
+            <div className="wizard-lava-wave wizard-lava-wave-two" />
+            <div className="wizard-lava-sheen" />
+          </div>
+        ) : (
+          <div className="absolute inset-0 opacity-80">
+            <div className="absolute -left-12 top-0 h-72 w-72 rounded-full bg-[#ff74d9]/22 blur-3xl" />
+            <div className="absolute right-0 top-40 h-80 w-80 rounded-full bg-[#8d5bff]/18 blur-3xl" />
+            <div className={classNames("absolute bottom-8 left-1/3 h-72 w-72 rounded-full blur-3xl", settings.lightMode ? "bg-[#2b2433]/10" : "bg-[#9590a8]/10")} />
+            {settings.lightMode && (
+              <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.65)_0%,transparent_100%)]" />
+            )}
+          </div>
         )}
       </div>
 
