@@ -2112,7 +2112,7 @@ export default function SudokuWizard() {
                     type="button"
                     onClick={() => loadFreshPuzzle(level)}
                     className={classNames(
-                      "relative min-w-[8.25rem] rounded-full border px-6 py-4 text-center transition-all duration-200 sm:min-w-[9rem]",
+                      "relative min-w-[6.8rem] rounded-full border px-4 py-3 text-center transition-all duration-200 sm:min-w-[7.4rem] sm:px-5",
                       active
                         ? wizardButton
                           ? "border-[#ff93e4]/42 bg-[rgba(255,255,255,0.08)] text-[var(--sw-title)] shadow-[0_12px_30px_rgba(188,98,255,0.22)]"
@@ -2125,7 +2125,7 @@ export default function SudokuWizard() {
                     {wizardButton && active && <span aria-hidden="true" className="wizard-mode-button-fill" />}
                     <span
                       className={classNames(
-                        "relative z-10 block text-lg font-semibold leading-none sm:text-[1.45rem]",
+                        "relative z-10 block text-[1.02rem] font-semibold leading-none tracking-[-0.03em] sm:text-[1.18rem]",
                         active && !wizardButton ? "text-[#1d0922]" : "text-current"
                       )}
                     >
@@ -2143,7 +2143,7 @@ export default function SudokuWizard() {
               icon={<Grid3X3 className="h-4 w-4" />}
               label="Difficulty"
               value={difficulty}
-              detail={isWizardMode ? "Arcane gauntlet" : `${DIFFICULTIES[difficulty].clues} clues`}
+              detail=""
             />
             <MetricCard
               icon={<Clock3 className="h-4 w-4" />}
@@ -2178,9 +2178,6 @@ export default function SudokuWizard() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <h2 className="text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">Board</h2>
-                <p className="mt-1 text-sm text-[var(--sw-muted)]">
-                  Click a square, use your keyboard, and tap <span className="font-semibold text-[#f3a3eb]">N</span> for notes.
-                </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -2442,13 +2439,6 @@ export default function SudokuWizard() {
                 <InlineStat label="Open cells" value={String(81 - filledCount)} />
                 {showMistakeRules && <InlineStat label="Mistakes" value={mistakeMetricValue} />}
               </div>
-              <p className="mt-4 text-sm leading-6 text-[var(--sw-muted)]">
-                {isSignedIn
-                  ? isWizardMode
-                    ? "Wizard boards never allow archives. Scores stay in your profile, and settings live in the gear."
-                    : "Scores and archives are tucked into your profile. Settings live in the gear."
-                  : "Guest boards do not save scores or archives. Use Log in if you want them stored."}
-              </p>
             </PanelCard>
 
             <AnimatePresence>
@@ -3152,8 +3142,8 @@ function MetricCard({ icon, label, value, detail }) {
         {icon}
         {label}
       </div>
-      <div className="mt-3 text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">{value}</div>
-      <div className="mt-1 text-sm text-[var(--sw-muted)]">{detail}</div>
+      <div className="mt-3 text-[1.8rem] font-extrabold tracking-[-0.04em] text-[var(--sw-title)]">{value}</div>
+      {detail ? <div className="mt-1 text-sm text-[var(--sw-muted)]">{detail}</div> : null}
     </div>
   );
 }
@@ -3248,7 +3238,7 @@ function CounterPill({ digit, remaining, selected }) {
         selected && remaining !== 0 && "border-[#f08be8]/45 bg-[#f08be8]/16 text-[#a12d93]"
       )}
     >
-      <div className="text-lg font-bold leading-none">{digit}</div>
+      <div className="text-[1.12rem] font-extrabold leading-none tracking-[-0.04em]">{digit}</div>
       <div className={classNames("mt-1 text-[12px] font-medium leading-none", helperTextClass)}>
         {remaining} left
       </div>
@@ -3260,7 +3250,7 @@ function InlineStat({ label, value }) {
   return (
     <div className="flex items-center justify-between rounded-[1rem] border border-[var(--sw-border-soft)] bg-[var(--sw-panel-soft)] px-3 py-2.5">
       <span className="text-sm text-[var(--sw-muted)]">{label}</span>
-      <span className="text-sm font-semibold text-[var(--sw-title)]">{value}</span>
+      <span className="text-sm font-extrabold tracking-[-0.03em] text-[var(--sw-title)]">{value}</span>
     </div>
   );
 }

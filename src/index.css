@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -6,8 +7,8 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --font-ui: "Avenir Next", "Segoe UI", sans-serif;
-  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --font-ui: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
 }
 
 html {
@@ -19,6 +20,9 @@ body {
   min-width: 320px;
   min-height: 100vh;
   font-family: var(--font-ui);
+  font-optical-sizing: auto;
+  letter-spacing: -0.015em;
+  line-height: 1.45;
   background: #050507;
 }
 
@@ -232,7 +236,7 @@ button {
   inset: 1px;
   border-radius: inherit;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(255, 167, 244, 0.18), rgba(156, 98, 255, 0.16));
+  background: linear-gradient(135deg, rgba(255, 178, 240, 0.2), rgba(156, 98, 255, 0.14));
   z-index: 0;
 }
 
@@ -241,8 +245,8 @@ button {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 165%;
-  height: 300%;
+  width: 178%;
+  height: 320%;
   border-radius: 42%;
   transform: translate(-50%, -50%);
   background:
@@ -255,8 +259,8 @@ button {
       rgba(255, 109, 210, 0.8) 302deg,
       rgba(255, 255, 255, 0) 360deg
     );
-  filter: blur(10px) saturate(1.18);
-  animation: wizard-button-swirl-spin 0.88s linear infinite;
+  filter: blur(9px) saturate(1.24);
+  animation: wizard-button-swirl-spin 0.72s linear infinite;
 }
 
 .wizard-mode-button-fill::after {
@@ -264,11 +268,11 @@ button {
   position: absolute;
   inset: -18%;
   background:
-    radial-gradient(circle at 24% 28%, rgba(255, 255, 255, 0.22) 0%, transparent 24%),
-    radial-gradient(circle at 74% 70%, rgba(94, 36, 141, 0.18) 0%, transparent 32%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.01) 44%, rgba(255, 255, 255, 0.12));
+    radial-gradient(circle at 24% 28%, rgba(255, 255, 255, 0.26) 0%, transparent 24%),
+    radial-gradient(circle at 74% 70%, rgba(94, 36, 141, 0.2) 0%, transparent 32%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.01) 44%, rgba(255, 255, 255, 0.14));
   mix-blend-mode: soft-light;
-  animation: wizard-button-swirl-drift 1.14s ease-in-out infinite;
+  animation: wizard-button-swirl-drift 0.92s ease-in-out infinite;
 }
 
 .wizard-mode-button > * {
