@@ -34,3 +34,137 @@ button {
   background: rgb(240 139 232 / 35%);
   color: #fff5ff;
 }
+
+@keyframes wizard-button-glow {
+  0% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 rgba(255, 143, 225, 0.14), 0 0 0 rgba(156, 98, 255, 0.14);
+  }
+  50% {
+    transform: translateY(-1px) scale(1.015);
+    box-shadow: 0 0 26px rgba(255, 143, 225, 0.34), 0 0 44px rgba(156, 98, 255, 0.3);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 rgba(255, 143, 225, 0.14), 0 0 0 rgba(156, 98, 255, 0.14);
+  }
+}
+
+@keyframes wizard-aura-float {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(26px, -18px, 0) scale(1.08) rotate(10deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes wizard-sky-shift {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1.02);
+    background-position: 0% 0%, 100% 0%, 30% 80%;
+  }
+  50% {
+    transform: translate3d(2%, 2%, 0) scale(1.08);
+    background-position: 100% 30%, 0% 80%, 65% 20%;
+  }
+  100% {
+    transform: translate3d(-2%, -1%, 0) scale(1.02);
+    background-position: 0% 0%, 100% 0%, 30% 80%;
+  }
+}
+
+.wizard-sky {
+  position: absolute;
+  inset: -12%;
+  opacity: 0.8;
+  filter: saturate(1.08);
+  background-size: 180% 180%, 170% 170%, 180% 180%;
+  animation: wizard-sky-shift 18s ease-in-out infinite;
+}
+
+.wizard-sky-light {
+  background-image:
+    radial-gradient(circle at 20% 18%, rgba(255, 146, 226, 0.34) 0%, rgba(255, 146, 226, 0) 44%),
+    radial-gradient(circle at 82% 26%, rgba(139, 102, 255, 0.26) 0%, rgba(139, 102, 255, 0) 46%),
+    radial-gradient(circle at 46% 84%, rgba(255, 245, 252, 0.54) 0%, rgba(255, 245, 252, 0) 48%);
+}
+
+.wizard-sky-dark {
+  background-image:
+    radial-gradient(circle at 20% 18%, rgba(255, 111, 215, 0.28) 0%, rgba(255, 111, 215, 0) 44%),
+    radial-gradient(circle at 82% 26%, rgba(114, 84, 255, 0.24) 0%, rgba(114, 84, 255, 0) 46%),
+    radial-gradient(circle at 46% 84%, rgba(255, 175, 233, 0.16) 0%, rgba(255, 175, 233, 0) 48%);
+}
+
+.wizard-mode-button {
+  position: relative;
+  overflow: hidden;
+  animation: wizard-button-glow 3.1s ease-in-out infinite;
+}
+
+.wizard-mode-button::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(135deg, rgba(255, 167, 244, 0.5), rgba(156, 98, 255, 0.5), rgba(255, 143, 225, 0.45));
+  opacity: 0.42;
+  z-index: 0;
+}
+
+.wizard-mode-button > * {
+  position: relative;
+  z-index: 1;
+}
+
+.wizard-mode-button-active {
+  animation-duration: 2.4s;
+}
+
+.wizard-aura {
+  position: absolute;
+  inset: auto;
+  border-radius: 9999px;
+  filter: blur(50px);
+  opacity: 0.38;
+  animation: wizard-aura-float 11s ease-in-out infinite;
+}
+
+.wizard-aura-light {
+  mix-blend-mode: screen;
+}
+
+.wizard-aura-dark {
+  mix-blend-mode: lighten;
+}
+
+.wizard-aura-one {
+  top: 6%;
+  right: 8%;
+  width: 18rem;
+  height: 18rem;
+  background: radial-gradient(circle, rgba(255, 143, 225, 0.34) 0%, rgba(255, 143, 225, 0) 70%);
+}
+
+.wizard-aura-two {
+  bottom: 9%;
+  left: 7%;
+  width: 24rem;
+  height: 24rem;
+  background: radial-gradient(circle, rgba(156, 98, 255, 0.3) 0%, rgba(156, 98, 255, 0) 72%);
+  animation-duration: 14s;
+  animation-delay: -3s;
+}
+
+.wizard-aura-three {
+  top: 42%;
+  left: 36%;
+  width: 16rem;
+  height: 16rem;
+  background: radial-gradient(circle, rgba(255, 223, 245, 0.24) 0%, rgba(255, 223, 245, 0) 74%);
+  animation-duration: 9s;
+  animation-delay: -5s;
+}

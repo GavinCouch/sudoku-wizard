@@ -56,11 +56,93 @@ const LOFI_STREAMS = [
   { name: "Lofi Radio Africa", url: "https://play.streamafrica.net/lofiradio" },
   { name: "laut.fm lofi", url: "https://stream.laut.fm/lofi" },
 ];
+const WIZARD_MISTAKE_LIMIT = 3;
 
 const DIFFICULTIES = {
-  Easy: { clues: 50, minClues: 48, hints: 8, minScore: 0, targetScore: 44, maxScore: 64, maxGuessDepth: 0, maxGuessCount: 0, minUnitClues: 4, minDigitClues: 3, restarts: 5 },
-  Medium: { clues: 44, minClues: 42, hints: 3, minScore: 34, targetScore: 62, maxScore: 140, maxGuessDepth: 1, maxGuessCount: 3, minUnitClues: 3, minDigitClues: 2, restarts: 6 },
-  Hard: { clues: 38, minClues: 36, hints: 0, minScore: 62, targetScore: 82, maxScore: 250, maxGuessDepth: 2, maxGuessCount: 8, minUnitClues: 2, minDigitClues: 1, restarts: 7 },
+  Easy: {
+    clues: 39,
+    minClues: 38,
+    maxClues: 40,
+    hints: 8,
+    minScore: 78,
+    targetScore: 88,
+    maxScore: 116,
+    minTechniqueTier: 1,
+    maxTechniqueTier: 2,
+    minAdvancedMoves: 0,
+    minGuessDepth: 0,
+    maxGuessDepth: 0,
+    minGuessCount: 0,
+    maxGuessCount: 0,
+    minUnitClues: 3,
+    minDigitClues: 2,
+    restarts: 10,
+    minAttemptsBeforeReturn: 2,
+    settlePenalty: 10,
+  },
+  Medium: {
+    clues: 33,
+    minClues: 32,
+    maxClues: 34,
+    hints: 3,
+    minScore: 118,
+    targetScore: 150,
+    maxScore: 235,
+    minTechniqueTier: 2,
+    maxTechniqueTier: 6,
+    minAdvancedMoves: 0,
+    minGuessDepth: 0,
+    maxGuessDepth: 1,
+    minGuessCount: 0,
+    maxGuessCount: 3,
+    minUnitClues: 2,
+    minDigitClues: 1,
+    restarts: 48,
+    minAttemptsBeforeReturn: 6,
+    settlePenalty: 22,
+  },
+  Hard: {
+    clues: 29,
+    minClues: 27,
+    maxClues: 30,
+    hints: 0,
+    minScore: 190,
+    targetScore: 245,
+    maxScore: 360,
+    minTechniqueTier: 4,
+    maxTechniqueTier: 6,
+    minAdvancedMoves: 6,
+    minGuessDepth: 0,
+    maxGuessDepth: 2,
+    minGuessCount: 0,
+    maxGuessCount: 8,
+    minUnitClues: 1,
+    minDigitClues: 1,
+    restarts: 48,
+    minAttemptsBeforeReturn: 10,
+    settlePenalty: 24,
+  },
+  Wizard: {
+    clues: 27,
+    minClues: 24,
+    maxClues: 28,
+    hints: 0,
+    minScore: 360,
+    targetScore: 480,
+    maxScore: 1000,
+    minTechniqueTier: 4,
+    maxTechniqueTier: 8,
+    minAdvancedMoves: 12,
+    minGuessDepth: 0,
+    maxGuessDepth: 5,
+    minGuessCount: 0,
+    maxGuessCount: 24,
+    minUnitClues: 0,
+    minDigitClues: 0,
+    restarts: 160,
+    minAttemptsBeforeReturn: 28,
+    settlePenalty: 46,
+  },
 };
 
 const DEFAULT_SETTINGS = {
@@ -192,15 +274,14 @@ const cellIndexes = Array.from({ length: 81 }, (_, index) => index);
 const allDigitMask = range9.reduce((mask, digit) => mask | (1 << digit), 0);
 const maskDigits = Array.from({ length: 1 << 10 }, (_, mask) => range9.filter((digit) => mask & (1 << digit)));
 const maskCounts = maskDigits.map((digits) => digits.length);
-const sudokuUnits = [
-  ...Array.from({ length: 9 }, (_, row) => Array.from({ length: 9 }, (_, col) => row * 9 + col)),
-  ...Array.from({ length: 9 }, (_, col) => Array.from({ length: 9 }, (_, row) => row * 9 + col)),
-  ...Array.from({ length: 9 }, (_, box) => {
-    const boxRow = Math.floor(box / 3) * 3;
-    const boxCol = (box % 3) * 3;
-    return Array.from({ length: 9 }, (_, index) => (boxRow + Math.floor(index / 3)) * 9 + boxCol + (index % 3));
-  }),
-];
+const rowUnits = Array.from({ length: 9 }, (_, row) => Array.from({ length: 9 }, (_, col) => row * 9 + col));
+const colUnits = Array.from({ length: 9 }, (_, col) => Array.from({ length: 9 }, (_, row) => row * 9 + col));
+const boxUnits = Array.from({ length: 9 }, (_, box) => {
+  const boxRow = Math.floor(box / 3) * 3;
+  const boxCol = (box % 3) * 3;
+  return Array.from({ length: 9 }, (_, index) => (boxRow + Math.floor(index / 3)) * 9 + boxCol + (index % 3));
+});
+const sudokuUnits = [...rowUnits, ...colUnits, ...boxUnits];
 const cellPeers = cellIndexes.map((index) => {
   const row = Math.floor(index / 9);
   const col = index % 9;
@@ -283,7 +364,7 @@ function hasBalancedClueSpread(board, profile) {
   return sudokuUnits.every((unit) => unit.filter((index) => values[index] !== 0).length >= profile.minUnitClues);
 }
 
-function getCandidateMasks(values) {
+function getCandidateMasks(values, existingMasks = null) {
   const masks = Array(81).fill(0);
 
   for (const index of cellIndexes) {
@@ -295,6 +376,10 @@ function getCandidateMasks(values) {
       if (peerValue !== 0) mask &= ~(1 << peerValue);
     }
 
+    if (existingMasks) {
+      mask &= existingMasks[index] || allDigitMask;
+    }
+
     if (mask === 0) return null;
     masks[index] = mask;
   }
@@ -302,18 +387,201 @@ function getCandidateMasks(values) {
   return masks;
 }
 
+function queueMaskRemoval(removals, index, bits) {
+  if (!bits) return;
+  removals.set(index, (removals.get(index) ?? 0) | bits);
+}
+
+function applyMaskRemovals(candidateMasks, removals) {
+  let removedCount = 0;
+  let changed = false;
+
+  for (const [index, bits] of removals) {
+    const currentMask = candidateMasks[index];
+    const nextMask = currentMask & ~bits;
+    if (nextMask === currentMask) continue;
+
+    removedCount += maskCounts[currentMask] - maskCounts[nextMask];
+    candidateMasks[index] = nextMask;
+    changed = true;
+
+    if (nextMask === 0) {
+      return { changed: true, invalid: true, removedCount };
+    }
+  }
+
+  return { changed, invalid: false, removedCount };
+}
+
+function collectLockedCandidateEliminations(values, candidateMasks) {
+  const removals = new Map();
+
+  for (let box = 0; box < 9; box += 1) {
+    const unit = boxUnits[box];
+
+    for (const digit of range9) {
+      const bit = 1 << digit;
+      const candidates = unit.filter((index) => values[index] === 0 && (candidateMasks[index] & bit));
+      if (candidates.length < 2) continue;
+
+      const rows = [...new Set(candidates.map((index) => Math.floor(index / 9)))];
+      if (rows.length === 1) {
+        const row = rows[0];
+        for (const index of rowUnits[row]) {
+          if (!unit.includes(index) && values[index] === 0 && (candidateMasks[index] & bit)) {
+            queueMaskRemoval(removals, index, bit);
+          }
+        }
+      }
+
+      const cols = [...new Set(candidates.map((index) => index % 9))];
+      if (cols.length === 1) {
+        const col = cols[0];
+        for (const index of colUnits[col]) {
+          if (!unit.includes(index) && values[index] === 0 && (candidateMasks[index] & bit)) {
+            queueMaskRemoval(removals, index, bit);
+          }
+        }
+      }
+    }
+  }
+
+  for (let row = 0; row < 9; row += 1) {
+    const unit = rowUnits[row];
+
+    for (const digit of range9) {
+      const bit = 1 << digit;
+      const candidates = unit.filter((index) => values[index] === 0 && (candidateMasks[index] & bit));
+      if (candidates.length < 2) continue;
+
+      const boxes = [...new Set(candidates.map((index) => getBoxIndex(Math.floor(index / 9), index % 9)))];
+      if (boxes.length !== 1) continue;
+
+      const box = boxes[0];
+      for (const index of boxUnits[box]) {
+        if (Math.floor(index / 9) !== row && values[index] === 0 && (candidateMasks[index] & bit)) {
+          queueMaskRemoval(removals, index, bit);
+        }
+      }
+    }
+  }
+
+  for (let col = 0; col < 9; col += 1) {
+    const unit = colUnits[col];
+
+    for (const digit of range9) {
+      const bit = 1 << digit;
+      const candidates = unit.filter((index) => values[index] === 0 && (candidateMasks[index] & bit));
+      if (candidates.length < 2) continue;
+
+      const boxes = [...new Set(candidates.map((index) => getBoxIndex(Math.floor(index / 9), index % 9)))];
+      if (boxes.length !== 1) continue;
+
+      const box = boxes[0];
+      for (const index of boxUnits[box]) {
+        if (index % 9 !== col && values[index] === 0 && (candidateMasks[index] & bit)) {
+          queueMaskRemoval(removals, index, bit);
+        }
+      }
+    }
+  }
+
+  return removals;
+}
+
+function collectNakedPairEliminations(values, candidateMasks) {
+  const removals = new Map();
+
+  for (const unit of sudokuUnits) {
+    const pairs = new Map();
+
+    for (const index of unit) {
+      if (values[index] !== 0 || maskCounts[candidateMasks[index]] !== 2) continue;
+      const mask = candidateMasks[index];
+      if (!pairs.has(mask)) pairs.set(mask, []);
+      pairs.get(mask).push(index);
+    }
+
+    for (const [mask, indexes] of pairs.entries()) {
+      if (indexes.length !== 2) continue;
+
+      for (const index of unit) {
+        if (indexes.includes(index) || values[index] !== 0 || !(candidateMasks[index] & mask)) continue;
+        queueMaskRemoval(removals, index, mask);
+      }
+    }
+  }
+
+  return removals;
+}
+
+function collectHiddenPairEliminations(values, candidateMasks) {
+  const removals = new Map();
+
+  for (const unit of sudokuUnits) {
+    const positionsByDigit = new Map(range9.map((digit) => [digit, []]));
+
+    for (const index of unit) {
+      if (values[index] !== 0) continue;
+      for (const digit of maskDigits[candidateMasks[index]]) {
+        positionsByDigit.get(digit).push(index);
+      }
+    }
+
+    for (let first = 1; first <= 8; first += 1) {
+      const firstPositions = positionsByDigit.get(first);
+      if (firstPositions.length !== 2) continue;
+
+      for (let second = first + 1; second <= 9; second += 1) {
+        const secondPositions = positionsByDigit.get(second);
+        if (
+          secondPositions.length !== 2 ||
+          firstPositions[0] !== secondPositions[0] ||
+          firstPositions[1] !== secondPositions[1]
+        ) {
+          continue;
+        }
+
+        const pairMask = (1 << first) | (1 << second);
+        for (const index of firstPositions) {
+          queueMaskRemoval(removals, index, candidateMasks[index] & ~pairMask);
+        }
+      }
+    }
+  }
+
+  return removals;
+}
+
 function applyLogicalSingles(values) {
   const next = [...values];
   let score = 0;
   let nakedSingles = 0;
   let hiddenSingles = 0;
+  let lockedCandidates = 0;
+  let nakedPairs = 0;
+  let hiddenPairs = 0;
+  let maxTechniqueTier = 0;
+  let candidateMasks = getCandidateMasks(next);
 
   while (true) {
-    const candidateMasks = getCandidateMasks(next);
     if (!candidateMasks) return { status: "invalid", values: next, score, nakedSingles, hiddenSingles, candidateMasks: null };
 
     const emptyIndexes = cellIndexes.filter((index) => next[index] === 0);
-    if (emptyIndexes.length === 0) return { status: "solved", values: next, score, nakedSingles, hiddenSingles, candidateMasks };
+    if (emptyIndexes.length === 0) {
+      return {
+        status: "solved",
+        values: next,
+        score,
+        nakedSingles,
+        hiddenSingles,
+        lockedCandidates,
+        nakedPairs,
+        hiddenPairs,
+        maxTechniqueTier,
+        candidateMasks,
+      };
+    }
 
     const nakedMoves = emptyIndexes
       .filter((index) => maskCounts[candidateMasks[index]] === 1)
@@ -323,6 +591,8 @@ function applyLogicalSingles(values) {
       for (const [index, digit] of nakedMoves) next[index] = digit;
       nakedSingles += nakedMoves.length;
       score += nakedMoves.length;
+      maxTechniqueTier = Math.max(maxTechniqueTier, 1);
+      candidateMasks = getCandidateMasks(next, candidateMasks);
       continue;
     }
 
@@ -349,11 +619,76 @@ function applyLogicalSingles(values) {
       for (const [index, digit] of hiddenMoves) next[index] = digit;
       hiddenSingles += hiddenMoves.size;
       score += hiddenMoves.size * 2;
+      maxTechniqueTier = Math.max(maxTechniqueTier, 2);
+      candidateMasks = getCandidateMasks(next, candidateMasks);
       continue;
     }
 
-    return { status: "stuck", values: next, score, nakedSingles, hiddenSingles, candidateMasks };
+    const lockedRemovals = collectLockedCandidateEliminations(next, candidateMasks);
+    const lockedResult = applyMaskRemovals(candidateMasks, lockedRemovals);
+    if (lockedResult.invalid) {
+      return { status: "invalid", values: next, score, nakedSingles, hiddenSingles, candidateMasks: null };
+    }
+    if (lockedResult.changed) {
+      lockedCandidates += lockedResult.removedCount;
+      score += lockedResult.removedCount * 4;
+      maxTechniqueTier = Math.max(maxTechniqueTier, 3);
+      continue;
+    }
+
+    const nakedPairRemovals = collectNakedPairEliminations(next, candidateMasks);
+    const nakedPairResult = applyMaskRemovals(candidateMasks, nakedPairRemovals);
+    if (nakedPairResult.invalid) {
+      return { status: "invalid", values: next, score, nakedSingles, hiddenSingles, candidateMasks: null };
+    }
+    if (nakedPairResult.changed) {
+      nakedPairs += nakedPairResult.removedCount;
+      score += nakedPairResult.removedCount * 7;
+      maxTechniqueTier = Math.max(maxTechniqueTier, 4);
+      continue;
+    }
+
+    const hiddenPairRemovals = collectHiddenPairEliminations(next, candidateMasks);
+    const hiddenPairResult = applyMaskRemovals(candidateMasks, hiddenPairRemovals);
+    if (hiddenPairResult.invalid) {
+      return { status: "invalid", values: next, score, nakedSingles, hiddenSingles, candidateMasks: null };
+    }
+    if (hiddenPairResult.changed) {
+      hiddenPairs += hiddenPairResult.removedCount;
+      score += hiddenPairResult.removedCount * 9;
+      maxTechniqueTier = Math.max(maxTechniqueTier, 5);
+      continue;
+    }
+
+    return {
+      status: "stuck",
+      values: next,
+      score,
+      nakedSingles,
+      hiddenSingles,
+      lockedCandidates,
+      nakedPairs,
+      hiddenPairs,
+      maxTechniqueTier,
+      candidateMasks,
+    };
   }
+}
+
+function createRemovalGroups() {
+  const groups = [];
+  const seen = new Set();
+
+  for (const index of shuffle(cellIndexes)) {
+    if (seen.has(index)) continue;
+
+    const mirror = 80 - index;
+    seen.add(index);
+    seen.add(mirror);
+    groups.push(index === mirror ? [index] : shuffle([index, mirror]));
+  }
+
+  return groups;
 }
 
 function findTightestCell(values, candidateMasks) {
@@ -377,7 +712,7 @@ function findTightestCell(values, candidateMasks) {
 }
 
 function solveWithRating(values, depth, stats) {
-  if (stats.nodes > 140) return false;
+  if (stats.nodes > 360) return false;
   stats.nodes += 1;
 
   const reduced = applyLogicalSingles(values);
@@ -389,7 +724,7 @@ function solveWithRating(values, depth, stats) {
 
   stats.guessCount += 1;
   stats.maxGuessDepth = Math.max(stats.maxGuessDepth, depth + 1);
-  stats.guessScore += (branch.count - 1) * 22 * (depth + 1) + 8;
+  stats.guessScore += (branch.count - 1) * 34 * (depth + 1) + 18;
 
   for (const digit of maskDigits[branch.mask]) {
     const next = [...reduced.values];
@@ -406,14 +741,23 @@ function ratePuzzle(board) {
   const openingMasks = getCandidateMasks(values);
   const openingIndexes = cellIndexes.filter((index) => values[index] === 0);
   const candidatePressure = openingMasks
-    ? openingIndexes.reduce((total, index) => total + maskCounts[openingMasks[index]], 0) * 0.08
+    ? openingIndexes.reduce((total, index) => total + maskCounts[openingMasks[index]], 0) * 0.18
     : 999;
   const reduced = applyLogicalSingles(values);
-  const baseScore = (81 - clueCount) * 0.25 + candidatePressure + reduced.score;
 
   if (reduced.status === "invalid") {
-    return { solved: false, score: 999, guessCount: 99, maxGuessDepth: 99 };
+    return {
+      solved: false,
+      score: 999,
+      guessCount: 99,
+      maxGuessDepth: 99,
+      techniqueTier: 9,
+      advancedMoves: 99,
+    };
   }
+
+  const advancedMoves = reduced.lockedCandidates + reduced.nakedPairs + reduced.hiddenPairs;
+  const baseScore = (81 - clueCount) * 0.48 + candidatePressure + reduced.score + advancedMoves * 1.6;
 
   if (reduced.status === "solved") {
     return {
@@ -421,17 +765,22 @@ function ratePuzzle(board) {
       score: Math.round(baseScore),
       guessCount: 0,
       maxGuessDepth: 0,
+      techniqueTier: reduced.maxTechniqueTier,
+      advancedMoves,
     };
   }
 
   const stats = { nodes: 0, guessCount: 0, maxGuessDepth: 0, guessScore: 0 };
   const solved = solveWithRating(reduced.values, 0, stats);
+  const guessTier = stats.guessCount > 0 ? 5 + Math.min(3, stats.maxGuessDepth - 1) : 0;
 
   return {
     solved,
-    score: Math.round(baseScore + stats.guessScore + stats.nodes * 0.6),
+    score: Math.round(baseScore + stats.guessScore + stats.nodes * 0.9),
     guessCount: stats.guessCount,
     maxGuessDepth: stats.maxGuessDepth,
+    techniqueTier: Math.max(reduced.maxTechniqueTier, guessTier),
+    advancedMoves,
   };
 }
 
@@ -454,79 +803,127 @@ function countSolutions(values, limit = 2) {
   return total;
 }
 
-function puzzleFitsDifficulty(rating, profile) {
+function puzzleFitsDifficulty(rating, profile, clueCount = null) {
   return (
     rating.solved &&
+    (clueCount === null || (clueCount >= profile.minClues && clueCount <= (profile.maxClues ?? profile.clues))) &&
     rating.score <= profile.maxScore &&
+    rating.techniqueTier >= (profile.minTechniqueTier ?? 0) &&
+    rating.techniqueTier <= (profile.maxTechniqueTier ?? Number.POSITIVE_INFINITY) &&
+    rating.advancedMoves >= (profile.minAdvancedMoves ?? 0) &&
+    rating.maxGuessDepth >= (profile.minGuessDepth ?? 0) &&
     rating.maxGuessDepth <= profile.maxGuessDepth &&
+    rating.guessCount >= (profile.minGuessCount ?? 0) &&
     rating.guessCount <= profile.maxGuessCount
   );
 }
 
 function puzzleTargetPenalty(rating, clueCount, profile) {
-  const tooEasyPenalty = Math.max(0, profile.minScore - rating.score) * 1.5;
-  return Math.abs(rating.score - profile.targetScore) + Math.abs(clueCount - profile.clues) * 3 + tooEasyPenalty;
+  const tooEasyPenalty = Math.max(0, profile.minScore - rating.score) * 6;
+  const techniquePenalty = Math.max(0, (profile.minTechniqueTier ?? 0) - rating.techniqueTier) * 30;
+  const advancedPenalty = Math.max(0, (profile.minAdvancedMoves ?? 0) - rating.advancedMoves) * 8;
+  const guessPenalty = Math.max(0, (profile.minGuessDepth ?? 0) - rating.maxGuessDepth) * 26;
+  return (
+    Math.abs(rating.score - profile.targetScore) +
+    Math.abs(clueCount - profile.clues) * 4 +
+    tooEasyPenalty +
+    techniquePenalty +
+    advancedPenalty +
+    guessPenalty
+  );
 }
 
 function carveRatedPuzzle(solution, profile) {
   let puzzle = copyBoard(solution);
-  let bestPuzzle = copyBoard(puzzle);
-  let bestRating = ratePuzzle(puzzle);
-  let bestPenalty = puzzleTargetPenalty(bestRating, countClues(puzzle), profile);
+  let bestPuzzle = null;
+  let bestRating = null;
+  let bestPenalty = Infinity;
 
-  for (const pos of shuffle(cellIndexes)) {
+  for (const group of createRemovalGroups()) {
     const clueCount = countClues(puzzle);
     if (clueCount <= profile.minClues) break;
 
-    const r = Math.floor(pos / 9);
-    const c = pos % 9;
-    if (puzzle[r][c] === 0) continue;
-
     const trial = copyBoard(puzzle);
-    trial[r][c] = 0;
+    let removedCount = 0;
 
-    if (!hasBalancedClueSpread(trial, profile)) continue;
+    for (const pos of group) {
+      const r = Math.floor(pos / 9);
+      const c = pos % 9;
+      if (trial[r][c] === 0) continue;
+      trial[r][c] = 0;
+      removedCount += 1;
+    }
 
-    const trialRating = ratePuzzle(trial);
-    if (!puzzleFitsDifficulty(trialRating, profile)) continue;
+    if (removedCount === 0) continue;
+    if (clueCount - removedCount < profile.minClues) continue;
+
     if (countSolutions(boardToValues(trial), 2) !== 1) continue;
+    if (!hasBalancedClueSpread(trial, profile)) continue;
 
     puzzle = trial;
 
-    const trialClueCount = clueCount - 1;
-    const penalty = puzzleTargetPenalty(trialRating, trialClueCount, profile);
-    if (penalty < bestPenalty) {
-      bestPuzzle = copyBoard(trial);
-      bestRating = trialRating;
-      bestPenalty = penalty;
+    const trialRating = ratePuzzle(trial);
+    const trialClueCount = clueCount - removedCount;
+    if (puzzleFitsDifficulty(trialRating, profile, trialClueCount)) {
+      const penalty = puzzleTargetPenalty(trialRating, trialClueCount, profile);
+      if (penalty < bestPenalty) {
+        bestPuzzle = copyBoard(trial);
+        bestRating = trialRating;
+        bestPenalty = penalty;
+      }
     }
   }
 
-  return { puzzle: bestPuzzle, rating: bestRating };
+  if (bestPuzzle && bestRating) {
+    return { puzzle: bestPuzzle, rating: bestRating };
+  }
+
+  return { puzzle, rating: ratePuzzle(puzzle) };
 }
 
 function generatePuzzle(difficulty) {
   const profile = DIFFICULTIES[difficulty] ?? DIFFICULTIES.Medium;
-  let best = null;
-  let bestPenalty = Infinity;
+  let bestFit = null;
+  let bestFitPenalty = Infinity;
+  let hardest = null;
+  let hardestScore = -Infinity;
+  let hardestClues = 81;
 
   for (let attempt = 0; attempt < profile.restarts; attempt += 1) {
     const solution = generateSolvedBoard();
     const { puzzle, rating } = carveRatedPuzzle(solution, profile);
     const clueCount = countClues(puzzle);
     const penalty = puzzleTargetPenalty(rating, clueCount, profile);
+    const candidate = { puzzle, solution, fixed: puzzle.map((row) => row.map((value) => value !== 0)) };
 
-    if (penalty < bestPenalty) {
-      best = { puzzle, solution, fixed: puzzle.map((row) => row.map((value) => value !== 0)) };
-      bestPenalty = penalty;
+    if (
+      rating.solved &&
+      (rating.score > hardestScore || (rating.score === hardestScore && clueCount < hardestClues))
+    ) {
+      hardest = candidate;
+      hardestScore = rating.score;
+      hardestClues = clueCount;
     }
 
-    if (clueCount <= profile.clues && clueCount >= profile.minClues && rating.score >= profile.minScore) {
-      return best;
+    if (puzzleFitsDifficulty(rating, profile, clueCount) && penalty < bestFitPenalty) {
+      bestFit = candidate;
+      bestFitPenalty = penalty;
+    }
+
+    if (
+      clueCount <= profile.clues &&
+      clueCount >= profile.minClues &&
+      puzzleFitsDifficulty(rating, profile, clueCount) &&
+      rating.score >= profile.minScore &&
+      attempt + 1 >= (profile.minAttemptsBeforeReturn ?? 1) &&
+      penalty <= (profile.settlePenalty ?? 0)
+    ) {
+      return bestFit ?? candidate;
     }
   }
 
-  return best;
+  if (bestFit) return bestFit;
+  return hardest;
 }
 
 function formatTime(seconds) {
@@ -815,6 +1212,7 @@ export default function SudokuWizard() {
   const [archiveSaving, setArchiveSaving] = useState(false);
   const [board, setBoard] = useState(puzzleData.puzzle);
   const [notes, setNotes] = useState(createEmptyNotes);
+  const [wizardFailOpen, setWizardFailOpen] = useState(false);
   const lofiAudioRef = useRef(null);
   const [lofiStatus, setLofiStatus] = useState("Off");
   const [lofiStreamIndex, setLofiStreamIndex] = useState(0);
@@ -826,18 +1224,26 @@ export default function SudokuWizard() {
   );
   const completed = useMemo(() => isSolvedBoard(board, puzzleData.solution), [board, puzzleData.solution]);
   const isSignedIn = accountMode === "user" && Boolean(authUser);
+  const isWizardMode = difficulty === "Wizard";
+  const showMistakeRules = settings.liveValidation || isWizardMode;
+  const wizardFailed = isWizardMode && mistakeCount >= WIZARD_MISTAKE_LIMIT;
+  const boardLocked = completed || wizardFailed;
   const activeAvatar = AVATARS.find((avatar) => avatar.id === profile.avatarId) ?? AVATARS[0];
   const ActiveAvatarIcon = activeAvatar.icon;
-  const timerIsRunning = settings.timerEnabled && !timerLocked && !completed;
+  const timerIsRunning = settings.timerEnabled && !timerLocked && !boardLocked;
   const themeVars = settings.lightMode ? LIGHT_THEME : DARK_THEME;
   const boardColors = settings.lightMode ? LIGHT_BOARD_COLORS : DARK_BOARD_COLORS;
   const lofiVolume = normalizeLofiVolume(settings.lofiVolume);
   const currentLofiStream = LOFI_STREAMS[lofiStreamIndex] ?? LOFI_STREAMS[0];
   const pageStyle = {
     ...themeVars,
-    background: settings.lightMode
-      ? "radial-gradient(circle at 12% -10%, rgba(255, 147, 228, 0.52) 0%, transparent 34%), radial-gradient(circle at 88% 8%, rgba(156, 98, 255, 0.34) 0%, transparent 32%), linear-gradient(135deg, #fff6fd 0%, #eee8f5 48%, #d6d1dc 100%)"
-      : "radial-gradient(circle at top left, #3a1245 0%, #17081f 45%, #050507 100%)",
+    background: isWizardMode
+      ? settings.lightMode
+        ? "radial-gradient(circle at 14% 0%, rgba(255, 149, 228, 0.58) 0%, transparent 28%), radial-gradient(circle at 85% 16%, rgba(155, 111, 255, 0.38) 0%, transparent 34%), radial-gradient(circle at 45% 92%, rgba(255, 223, 245, 0.62) 0%, transparent 38%), linear-gradient(135deg, #fffaff 0%, #f5eefc 42%, #e4dcf2 100%)"
+        : "radial-gradient(circle at 14% 0%, rgba(255, 111, 215, 0.28) 0%, transparent 28%), radial-gradient(circle at 85% 16%, rgba(114, 84, 255, 0.24) 0%, transparent 34%), radial-gradient(circle at 45% 92%, rgba(255, 175, 233, 0.18) 0%, transparent 38%), linear-gradient(135deg, #1e0e28 0%, #0f0717 52%, #030305 100%)"
+      : settings.lightMode
+        ? "radial-gradient(circle at 12% -10%, rgba(255, 147, 228, 0.52) 0%, transparent 34%), radial-gradient(circle at 88% 8%, rgba(156, 98, 255, 0.34) 0%, transparent 32%), linear-gradient(135deg, #fff6fd 0%, #eee8f5 48%, #d6d1dc 100%)"
+        : "radial-gradient(circle at top left, #3a1245 0%, #17081f 45%, #050507 100%)",
     color: "var(--sw-text)",
   };
 
@@ -1063,8 +1469,22 @@ export default function SudokuWizard() {
   const hintLimit = DIFFICULTIES[difficulty].hints;
   const hintsRemaining = Math.max(0, hintLimit - hintCount);
   const progressLabel = `${filledCount}/81`;
-  const mistakeDetail = mistakeCount === 0 ? "Clean run so far" : `${mistakeCount} total this board`;
-  const timeDetail = timerLocked ? "Archived, no best time" : settings.timerEnabled ? "Current board" : "Timer disabled";
+  const mistakesRemaining = Math.max(0, WIZARD_MISTAKE_LIMIT - mistakeCount);
+  const mistakeDetail = isWizardMode
+    ? wizardFailed
+      ? "Board locked after 3 mistakes"
+      : `${mistakesRemaining} ${mistakesRemaining === 1 ? "mistake" : "mistakes"} left`
+    : mistakeCount === 0
+      ? "Clean run so far"
+      : `${mistakeCount} total this board`;
+  const mistakeMetricValue = isWizardMode ? `${Math.min(mistakeCount, WIZARD_MISTAKE_LIMIT)}/${WIZARD_MISTAKE_LIMIT}` : String(mistakeCount);
+  const timeDetail = wizardFailed
+    ? "Review only, puzzle failed"
+    : timerLocked
+      ? "Archived, no best time"
+      : settings.timerEnabled
+        ? "Current board"
+        : "Timer disabled";
   const selectedLabel =
     selected.r !== null && selected.c !== null ? `R${selected.r + 1} C${selected.c + 1}` : "None";
   const winMessage = completed
@@ -1267,7 +1687,7 @@ export default function SudokuWizard() {
   }
 
   async function archiveCurrentPuzzle() {
-    if (!isSignedIn || completed || archiveSaving) return;
+    if (!isSignedIn || boardLocked || archiveSaving) return;
 
     const existingArchive = archives.find((archive) => archive.id === archivedPuzzleId);
     if (!existingArchive && archives.length >= MAX_ARCHIVES) {
@@ -1317,6 +1737,7 @@ export default function SudokuWizard() {
     setTimerLocked(true);
     setArchivedPuzzleId(archive.id);
     setCompletionRecorded(false);
+    setWizardFailOpen(archive.difficulty === "Wizard" && (archive.mistakeCount ?? 0) >= WIZARD_MISTAKE_LIMIT);
     setProfileOpen(false);
   }
 
@@ -1396,10 +1817,11 @@ export default function SudokuWizard() {
 
   function setCellValue(num) {
     const { r, c } = selected;
-    if (r === null || c === null || completed) return;
+    if (r === null || c === null || boardLocked) return;
     if (puzzleData.fixed[r][c]) return;
     if (num === board[r][c]) return;
     const correctPlacement = num !== 0 && num === puzzleData.solution[r][c];
+    const wrongPlacement = num !== 0 && num !== puzzleData.solution[r][c];
 
     if (noteMode && num !== 0 && board[r][c] === 0) {
       toggleNoteValue(r, c, num);
@@ -1411,24 +1833,28 @@ export default function SudokuWizard() {
     setBoard(nextBoard);
     recordSolvedBoard(nextBoard);
 
-    if (num !== 0 && num !== puzzleData.solution[r][c]) {
-      setMistakeCount((current) => current + 1);
+    if (wrongPlacement) {
+      const nextMistakeCount = mistakeCount + 1;
+      setMistakeCount(nextMistakeCount);
+      if (isWizardMode && nextMistakeCount >= WIZARD_MISTAKE_LIMIT) {
+        setWizardFailOpen(true);
+      }
     }
 
     setNotes((current) => {
-      const next = settings.liveValidation && correctPlacement ? removeNoteFromPeerGroups(current, r, c, num) : copyNotes(current);
+      const next = showMistakeRules && correctPlacement ? removeNoteFromPeerGroups(current, r, c, num) : copyNotes(current);
       next[r][c] = [];
       return next;
     });
 
-    if (num !== 0 && settings.liveValidation) {
+    if (num !== 0 && showMistakeRules) {
       triggerFeedback(`${r}-${c}`, correctPlacement ? "correct" : "wrong");
     }
   }
 
   function clearSelectedCell() {
     const { r, c } = selected;
-    if (r === null || c === null || puzzleData.fixed[r][c] || completed) return;
+    if (r === null || c === null || puzzleData.fixed[r][c] || boardLocked) return;
 
     setBoard((current) => {
       const next = copyBoard(current);
@@ -1444,7 +1870,7 @@ export default function SudokuWizard() {
   }
 
   function applyHint() {
-    if (completed || hintsRemaining <= 0) return;
+    if (boardLocked || hintsRemaining <= 0) return;
 
     const target = findHintTarget(board, puzzleData.fixed, selected);
     if (!target) return;
@@ -1460,7 +1886,7 @@ export default function SudokuWizard() {
     recordSolvedBoard(nextBoard);
 
     setNotes((current) => {
-      const next = settings.liveValidation ? removeNoteFromPeerGroups(current, r, c, nextValue) : copyNotes(current);
+      const next = showMistakeRules ? removeNoteFromPeerGroups(current, r, c, nextValue) : copyNotes(current);
       next[r][c] = [];
       return next;
     });
@@ -1485,6 +1911,15 @@ export default function SudokuWizard() {
     setTimerLocked(false);
     setArchivedPuzzleId(null);
     setCompletionRecorded(false);
+    setWizardFailOpen(false);
+  }
+
+  function reviewWizardBoard() {
+    setWizardFailOpen(false);
+  }
+
+  function restartWizardBoard() {
+    loadFreshPuzzle("Wizard");
   }
 
   function moveSelection(rowDelta, colDelta) {
@@ -1590,11 +2025,21 @@ export default function SudokuWizard() {
       className="min-h-screen overflow-hidden transition-colors duration-500"
     >
       <div className="pointer-events-none absolute inset-0 opacity-80">
+        {isWizardMode && (
+          <div className={classNames("wizard-sky", settings.lightMode ? "wizard-sky-light" : "wizard-sky-dark")} />
+        )}
         <div className="absolute -left-12 top-0 h-72 w-72 rounded-full bg-[#ff74d9]/22 blur-3xl" />
         <div className="absolute right-0 top-40 h-80 w-80 rounded-full bg-[#8d5bff]/18 blur-3xl" />
         <div className={classNames("absolute bottom-0 left-1/3 h-72 w-72 rounded-full blur-3xl", settings.lightMode ? "bg-[#2b2433]/10" : "bg-[#9590a8]/10")} />
         {settings.lightMode && (
           <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.65)_0%,transparent_100%)]" />
+        )}
+        {isWizardMode && (
+          <>
+            <div className={classNames("wizard-aura wizard-aura-one", settings.lightMode ? "wizard-aura-light" : "wizard-aura-dark")} />
+            <div className={classNames("wizard-aura wizard-aura-two", settings.lightMode ? "wizard-aura-light" : "wizard-aura-dark")} />
+            <div className={classNames("wizard-aura wizard-aura-three", settings.lightMode ? "wizard-aura-light" : "wizard-aura-dark")} />
+          </>
         )}
       </div>
 
@@ -1648,34 +2093,41 @@ export default function SudokuWizard() {
               </div>
 
               <div className="flex flex-wrap gap-2 xl:justify-end">
-                {Object.entries(DIFFICULTIES).map(([level, info]) => (
+                {Object.entries(DIFFICULTIES).map(([level, info]) => {
+                  const wizardButton = level === "Wizard";
+                  const active = difficulty === level;
+
+                  return (
                   <button
                     key={level}
                     type="button"
                     onClick={() => loadFreshPuzzle(level)}
                     className={classNames(
                       "rounded-full border px-4 py-2.5 text-left transition-all duration-200",
-                      difficulty === level
+                      active
                         ? "border-[#ff93e4]/40 bg-[linear-gradient(135deg,#ff8fe1_0%,#9c62ff_100%)] text-[#1d0922] shadow-[0_12px_30px_rgba(188,98,255,0.28)]"
-                        : "border-[var(--sw-border)] bg-[var(--sw-panel-soft)] text-[var(--sw-text)] hover:border-[#be86ff]/35 hover:bg-[var(--sw-panel-hover)]"
+                        : "border-[var(--sw-border)] bg-[var(--sw-panel-soft)] text-[var(--sw-text)] hover:border-[#be86ff]/35 hover:bg-[var(--sw-panel-hover)]",
+                      wizardButton && "wizard-mode-button",
+                      wizardButton && active && "wizard-mode-button-active"
                     )}
                   >
                     <div className="text-sm font-semibold">{level}</div>
-                    <div className={classNames("text-xs", difficulty === level ? "text-[#3c1644]" : "text-[var(--sw-muted)]")}>
-                      {info.clues} clues
+                    <div className={classNames("text-xs", active ? "text-[#3c1644]" : "text-[var(--sw-muted)]")}>
+                      {wizardButton ? "Arcane trial" : `${info.clues} clues`}
                     </div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          <div className={classNames("mt-6 grid gap-3 sm:grid-cols-2", settings.liveValidation ? "xl:grid-cols-4" : "xl:grid-cols-3")}>
+          <div className={classNames("mt-6 grid gap-3 sm:grid-cols-2", showMistakeRules ? "xl:grid-cols-4" : "xl:grid-cols-3")}>
             <MetricCard
               icon={<Grid3X3 className="h-4 w-4" />}
               label="Difficulty"
               value={difficulty}
-              detail={`${DIFFICULTIES[difficulty].clues} clues`}
+              detail={isWizardMode ? "Arcane gauntlet" : `${DIFFICULTIES[difficulty].clues} clues`}
             />
             <MetricCard
               icon={<Clock3 className="h-4 w-4" />}
@@ -1689,11 +2141,11 @@ export default function SudokuWizard() {
               value={progressLabel}
               detail={`${81 - filledCount} open`}
             />
-            {settings.liveValidation && (
+            {showMistakeRules && (
               <MetricCard
                 icon={<AlertTriangle className="h-4 w-4" />}
                 label="Mistakes"
-                value={String(mistakeCount)}
+                value={mistakeMetricValue}
                 detail={mistakeDetail}
               />
             )}
@@ -1726,14 +2178,14 @@ export default function SudokuWizard() {
                   icon={<Lightbulb className="h-4 w-4" />}
                   label={hintLimit === 0 ? "Hints off" : `Hint ${hintsRemaining}`}
                   onClick={applyHint}
-                  disabled={completed || hintsRemaining <= 0}
+                  disabled={boardLocked || hintsRemaining <= 0}
                 />
                 <UtilityButton
                   icon={<Eraser className="h-4 w-4" />}
                   label="Clear"
                   onClick={clearSelectedCell}
                   disabled={
-                    completed ||
+                    boardLocked ||
                     selected.r === null ||
                     selected.c === null ||
                     puzzleData.fixed[selected.r][selected.c]
@@ -1744,7 +2196,7 @@ export default function SudokuWizard() {
                     icon={<Archive className="h-4 w-4" />}
                     label={archiveSaving ? "Saving..." : archivedPuzzleId ? "Update archive" : `Archive ${archives.length}/${MAX_ARCHIVES}`}
                     onClick={archiveCurrentPuzzle}
-                    disabled={archiveSaving || completed || (!archivedPuzzleId && archives.length >= MAX_ARCHIVES)}
+                    disabled={archiveSaving || boardLocked || (!archivedPuzzleId && archives.length >= MAX_ARCHIVES)}
                   />
                 )}
                 {!showResetConfirm && (
@@ -1830,7 +2282,7 @@ export default function SudokuWizard() {
                         const wrongPulse = feedbackType === "wrong";
                         const noteBlockedPulse = feedbackType === "note-blocked";
                         const noteConflictPulse = feedbackType === "note-conflict";
-                        const wrong = settings.liveValidation && !fixed && value !== 0 && value !== puzzleData.solution[r][c];
+                        const wrong = showMistakeRules && !fixed && value !== 0 && value !== puzzleData.solution[r][c];
                         const noteValues = notes[r][c];
                         let backgroundColor = fixed ? boardColors.fixed : boardColors.open;
                         let textColor = fixed ? boardColors.fixedText : boardColors.userText;
@@ -1969,10 +2421,10 @@ export default function SudokuWizard() {
               <div className="space-y-3">
                 <InlineStat label="Difficulty" value={difficulty} />
                 <InlineStat label="Selected" value={selectedLabel} />
-                <InlineStat label="Mode" value={noteMode ? "Notes" : "Fill"} />
+                <InlineStat label="Mode" value={wizardFailed ? "Review" : noteMode ? "Notes" : "Fill"} />
                 <InlineStat label="Hints left" value={String(hintsRemaining)} />
                 <InlineStat label="Open cells" value={String(81 - filledCount)} />
-                {settings.liveValidation && <InlineStat label="Mistakes" value={String(mistakeCount)} />}
+                {showMistakeRules && <InlineStat label="Mistakes" value={mistakeMetricValue} />}
               </div>
               <p className="mt-4 text-sm leading-6 text-[var(--sw-muted)]">
                 {isSignedIn ? "Scores and archives are tucked into your profile. Settings live in the gear." : "Guest boards do not save scores or archives. Use Log in if you want them stored."}
@@ -1980,6 +2432,22 @@ export default function SudokuWizard() {
             </PanelCard>
 
             <AnimatePresence>
+              {wizardFailed && (
+                <motion.div
+                  initial={{ opacity: 0, y: 14, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.99 }}
+                  className="rounded-[2rem] border border-[#f35e92]/28 bg-[#f35e92]/12 p-6 shadow-[var(--sw-shadow-tight)]"
+                >
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-6 w-6 text-[#f35e92]" />
+                    <h2 className="text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">Wizard Failed</h2>
+                  </div>
+                  <p className="mt-3 text-sm leading-7 text-[var(--sw-muted)]">
+                    Three mistakes locked this board. You can review it, but no more changes can be made.
+                  </p>
+                </motion.div>
+              )}
               {completed && (
                 <motion.div
                   initial={{ opacity: 0, y: 14, scale: 0.98 }}
@@ -2038,12 +2506,78 @@ export default function SudokuWizard() {
         onPause={() => setLofiStatus("Off")}
         onError={handleLofiStreamError}
       />
+      <WizardFailDialog
+        open={wizardFailOpen}
+        lightMode={settings.lightMode}
+        onReview={reviewWizardBoard}
+        onNewPuzzle={restartWizardBoard}
+      />
     </div>
   );
 }
 
 function completionPercent(filledCount) {
   return Math.round((filledCount / 81) * 100);
+}
+
+function WizardFailDialog({ open, lightMode, onReview, onNewPuzzle }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+        >
+          <div className="flex min-h-full items-center justify-center px-4 py-6">
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              className={classNames(
+                "w-full max-w-md rounded-[2rem] border p-6 shadow-[0_24px_90px_rgba(0,0,0,0.36)]",
+                lightMode
+                  ? "border-[#c895df]/35 bg-[rgba(255,251,255,0.96)] text-[#302139]"
+                  : "border-[#f08be8]/25 bg-[rgba(15,11,22,0.96)] text-[#f6efff]"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#f35e92]/14 text-[#f35e92]">
+                  <AlertTriangle className="h-6 w-6" />
+                </span>
+                <div>
+                  <h2 className="text-2xl text-[var(--sw-title)] [font-family:var(--font-display)]">Three Mistakes</h2>
+                  <p className="mt-1 text-sm text-[var(--sw-muted)]">Wizard mode is locked for this board.</p>
+                </div>
+              </div>
+
+              <p className="mt-5 text-sm leading-7 text-[var(--sw-muted)]">
+                You made 3 mistakes. You can review this board, but no more changes can be made, or you can start a new Wizard puzzle.
+              </p>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={onReview}
+                  className="rounded-full border border-[var(--sw-border)] bg-[var(--sw-panel-soft)] px-4 py-3 text-sm font-semibold text-[var(--sw-title)] transition-all duration-200 hover:bg-[var(--sw-panel-hover)]"
+                >
+                  Review
+                </button>
+                <button
+                  type="button"
+                  onClick={onNewPuzzle}
+                  className="rounded-full bg-[linear-gradient(135deg,#ff8fe1_0%,#9c62ff_100%)] px-4 py-3 text-sm font-semibold text-[#1d0922]"
+                >
+                  New Puzzle
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }
 
 function AccountDataLoader({ title, detail, actionLabel, onAction }) {
