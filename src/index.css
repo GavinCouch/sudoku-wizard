@@ -241,6 +241,8 @@ button {
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  border-radius: 9999px;
+  clip-path: inset(0 round 9999px);
 }
 
 .wizard-mode-button-active {
@@ -249,6 +251,8 @@ button {
   background-size: 220% 220%;
   animation: wizard-button-liquid-flow 0.9s linear infinite;
   box-shadow: 0 10px 22px rgba(126, 54, 214, 0.18);
+  border-radius: inherit;
+  background-clip: padding-box;
 }
 
 .wizard-mode-button-active::before {
@@ -275,6 +279,7 @@ button {
   mix-blend-mode: screen;
   animation: wizard-button-swirl-spin 0.48s linear infinite;
   z-index: 0;
+  clip-path: inset(0 round 9999px);
 }
 
 .wizard-mode-button-active::after {
@@ -288,6 +293,7 @@ button {
   mix-blend-mode: overlay;
   animation: wizard-button-swirl-drift 0.58s ease-in-out infinite;
   z-index: 0;
+  clip-path: inset(0 round 9999px);
 }
 
 .wizard-mode-button > * {
