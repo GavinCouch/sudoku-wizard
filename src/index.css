@@ -233,10 +233,11 @@ button {
 
 .wizard-mode-button-fill {
   position: absolute;
-  inset: 1px;
+  inset: 0;
   border-radius: inherit;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(255, 178, 240, 0.2), rgba(156, 98, 255, 0.14));
+  background:
+    linear-gradient(135deg, rgba(255, 167, 244, 0.88) 0%, rgba(188, 108, 255, 0.94) 48%, rgba(255, 146, 221, 0.9) 100%);
   z-index: 0;
 }
 
@@ -245,8 +246,8 @@ button {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 178%;
-  height: 320%;
+  width: 215%;
+  height: 360%;
   border-radius: 42%;
   transform: translate(-50%, -50%);
   background:
@@ -259,20 +260,21 @@ button {
       rgba(255, 109, 210, 0.8) 302deg,
       rgba(255, 255, 255, 0) 360deg
     );
-  filter: blur(9px) saturate(1.24);
-  animation: wizard-button-swirl-spin 0.72s linear infinite;
+  filter: blur(7px) saturate(1.32);
+  opacity: 0.96;
+  animation: wizard-button-swirl-spin 0.56s linear infinite;
 }
 
 .wizard-mode-button-fill::after {
   content: "";
   position: absolute;
-  inset: -18%;
+  inset: -16%;
   background:
-    radial-gradient(circle at 24% 28%, rgba(255, 255, 255, 0.26) 0%, transparent 24%),
-    radial-gradient(circle at 74% 70%, rgba(94, 36, 141, 0.2) 0%, transparent 32%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.01) 44%, rgba(255, 255, 255, 0.14));
+    radial-gradient(circle at 24% 28%, rgba(255, 255, 255, 0.34) 0%, transparent 24%),
+    radial-gradient(circle at 74% 70%, rgba(79, 22, 126, 0.26) 0%, transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.01) 44%, rgba(255, 255, 255, 0.18));
   mix-blend-mode: soft-light;
-  animation: wizard-button-swirl-drift 0.92s ease-in-out infinite;
+  animation: wizard-button-swirl-drift 0.68s ease-in-out infinite;
 }
 
 .wizard-mode-button > * {
@@ -281,7 +283,7 @@ button {
 }
 
 .wizard-mode-button-active {
-  box-shadow: 0 0 22px rgba(255, 143, 225, 0.26), 0 0 36px rgba(156, 98, 255, 0.24);
+  box-shadow: 0 0 22px rgba(255, 143, 225, 0.18), 0 0 34px rgba(156, 98, 255, 0.18);
 }
 
 .wizard-lava-wave {

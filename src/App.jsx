@@ -1177,6 +1177,18 @@ function authErrorMessage(error) {
   return error?.message ?? "Something went wrong.";
 }
 
+function createSceneStyle(lightMode) {
+  const themeVars = lightMode ? LIGHT_THEME : DARK_THEME;
+
+  return {
+    ...themeVars,
+    background: lightMode
+      ? "radial-gradient(circle at 18% 16%, rgba(255, 173, 234, 0.52) 0%, transparent 34%), radial-gradient(circle at 82% 20%, rgba(170, 126, 255, 0.34) 0%, transparent 36%), radial-gradient(circle at 52% 76%, rgba(255, 248, 252, 0.54) 0%, transparent 40%), linear-gradient(155deg, #fffaff 0%, #f7eefc 42%, #e7dcf3 100%)"
+      : "radial-gradient(circle at 18% 16%, rgba(255, 118, 216, 0.26) 0%, transparent 34%), radial-gradient(circle at 82% 20%, rgba(123, 91, 255, 0.22) 0%, transparent 36%), radial-gradient(circle at 52% 76%, rgba(255, 188, 236, 0.12) 0%, transparent 40%), linear-gradient(155deg, #24102e 0%, #120818 44%, #040406 100%)",
+    color: "var(--sw-text)",
+  };
+}
+
 function readRoute() {
   if (typeof window === "undefined") return "game";
   return window.location.hash === "#/account" ? "account" : "game";
@@ -1231,21 +1243,10 @@ export default function SudokuWizard() {
   const activeAvatar = AVATARS.find((avatar) => avatar.id === profile.avatarId) ?? AVATARS[0];
   const ActiveAvatarIcon = activeAvatar.icon;
   const timerIsRunning = settings.timerEnabled && !timerLocked && !boardLocked;
-  const themeVars = settings.lightMode ? LIGHT_THEME : DARK_THEME;
   const boardColors = settings.lightMode ? LIGHT_BOARD_COLORS : DARK_BOARD_COLORS;
   const lofiVolume = normalizeLofiVolume(settings.lofiVolume);
   const currentLofiStream = LOFI_STREAMS[lofiStreamIndex] ?? LOFI_STREAMS[0];
-  const pageStyle = {
-    ...themeVars,
-    background: isWizardMode
-      ? settings.lightMode
-        ? "radial-gradient(circle at 18% 16%, rgba(255, 173, 234, 0.52) 0%, transparent 34%), radial-gradient(circle at 82% 20%, rgba(170, 126, 255, 0.34) 0%, transparent 36%), radial-gradient(circle at 52% 76%, rgba(255, 248, 252, 0.54) 0%, transparent 40%), linear-gradient(155deg, #fffaff 0%, #f7eefc 42%, #e7dcf3 100%)"
-        : "radial-gradient(circle at 18% 16%, rgba(255, 118, 216, 0.26) 0%, transparent 34%), radial-gradient(circle at 82% 20%, rgba(123, 91, 255, 0.22) 0%, transparent 36%), radial-gradient(circle at 52% 76%, rgba(255, 188, 236, 0.12) 0%, transparent 40%), linear-gradient(155deg, #24102e 0%, #120818 44%, #040406 100%)"
-      : settings.lightMode
-        ? "radial-gradient(circle at 12% -10%, rgba(255, 147, 228, 0.52) 0%, transparent 34%), radial-gradient(circle at 88% 8%, rgba(156, 98, 255, 0.34) 0%, transparent 32%), linear-gradient(135deg, #fff6fd 0%, #eee8f5 48%, #d6d1dc 100%)"
-        : "radial-gradient(circle at top left, #3a1245 0%, #17081f 45%, #050507 100%)",
-    color: "var(--sw-text)",
-  };
+  const pageStyle = createSceneStyle(settings.lightMode);
 
   function setAppRoute(nextRoute) {
     setRoute(nextRoute);
@@ -2000,20 +2001,21 @@ export default function SudokuWizard() {
   }, []);
 
   if (accountMode === "loading") {
-    return <AccountDataLoader title="Checking your sign-in" detail="Sudoku Wizard is checking whether this device already has an account session." />;
+    return <AccountDataLoader lightMode={settings.lightMode} title="Checking your sign-in" detail="Sudoku Wizard is checking whether this device already has an account session." />;
   }
 
   if (accountMode === "loadingProfile") {
-    return <AccountDataLoader title="Fetching your account data" detail="Syncing your avatar, archives, scores, and settings before the board loads." />;
+    return <AccountDataLoader lightMode={settings.lightMode} title="Fetching your account data" detail="Syncing your avatar, archives, scores, and settings before the board loads." />;
   }
 
   if (accountMode === "profileError") {
-    return <AccountDataLoader title="Could not fetch your account data" detail={accountMessage} actionLabel="Log out" onAction={handleLogout} />;
+    return <AccountDataLoader lightMode={settings.lightMode} title="Could not fetch your account data" detail={accountMessage} actionLabel="Log out" onAction={handleLogout} />;
   }
 
   if (route === "account" && !isSignedIn) {
     return (
       <AccountGate
+        lightMode={settings.lightMode}
         message={accountMessage}
         onSignIn={handleSignIn}
         onSignUp={handleSignUp}
@@ -2028,29 +2030,7 @@ export default function SudokuWizard() {
       style={pageStyle}
       className="relative min-h-screen overflow-hidden transition-colors duration-500"
     >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {isWizardMode ? (
-          <div className={classNames("wizard-lava-stage", settings.lightMode ? "wizard-lava-stage-light" : "wizard-lava-stage-dark")}>
-            <div className="wizard-lava-blob wizard-lava-blob-one" />
-            <div className="wizard-lava-blob wizard-lava-blob-two" />
-            <div className="wizard-lava-blob wizard-lava-blob-three" />
-            <div className="wizard-lava-blob wizard-lava-blob-four" />
-            <div className="wizard-lava-blob wizard-lava-blob-five" />
-            <div className="wizard-lava-wave wizard-lava-wave-one" />
-            <div className="wizard-lava-wave wizard-lava-wave-two" />
-            <div className="wizard-lava-sheen" />
-          </div>
-        ) : (
-          <div className="absolute inset-0 opacity-80">
-            <div className="absolute -left-12 top-0 h-72 w-72 rounded-full bg-[#ff74d9]/22 blur-3xl" />
-            <div className="absolute right-0 top-40 h-80 w-80 rounded-full bg-[#8d5bff]/18 blur-3xl" />
-            <div className={classNames("absolute bottom-8 left-1/3 h-72 w-72 rounded-full blur-3xl", settings.lightMode ? "bg-[#2b2433]/10" : "bg-[#9590a8]/10")} />
-            {settings.lightMode && (
-              <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.65)_0%,transparent_100%)]" />
-            )}
-          </div>
-        )}
-      </div>
+      <AnimatedBackdrop lightMode={settings.lightMode} />
 
       <div className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <MotionHeader
@@ -2112,10 +2092,10 @@ export default function SudokuWizard() {
                     type="button"
                     onClick={() => loadFreshPuzzle(level)}
                     className={classNames(
-                      "relative min-w-[6.8rem] rounded-full border px-4 py-3 text-center transition-all duration-200 sm:min-w-[7.4rem] sm:px-5",
+                      "relative min-w-[6.3rem] rounded-full border px-4 py-2.5 text-center transition-all duration-200 sm:min-w-[6.8rem]",
                       active
                         ? wizardButton
-                          ? "border-[#ff93e4]/42 bg-[rgba(255,255,255,0.08)] text-[var(--sw-title)] shadow-[0_12px_30px_rgba(188,98,255,0.22)]"
+                          ? "border-transparent bg-transparent text-[#fbf4ff] shadow-[0_12px_30px_rgba(188,98,255,0.24)]"
                           : "border-[#ff93e4]/40 bg-[linear-gradient(135deg,#ff8fe1_0%,#9c62ff_100%)] text-[#1d0922] shadow-[0_12px_30px_rgba(188,98,255,0.28)]"
                         : "border-[var(--sw-border)] bg-[var(--sw-panel-soft)] text-[var(--sw-title)] hover:border-[#be86ff]/35 hover:bg-[var(--sw-panel-hover)]",
                       wizardButton && "wizard-mode-button",
@@ -2125,7 +2105,7 @@ export default function SudokuWizard() {
                     {wizardButton && active && <span aria-hidden="true" className="wizard-mode-button-fill" />}
                     <span
                       className={classNames(
-                        "relative z-10 block text-[1.02rem] font-semibold leading-none tracking-[-0.03em] sm:text-[1.18rem]",
+                        "relative z-10 block text-[0.98rem] font-semibold leading-none tracking-[-0.035em] sm:text-[1.08rem]",
                         active && !wizardButton ? "text-[#1d0922]" : "text-current"
                       )}
                     >
@@ -2530,6 +2510,23 @@ function completionPercent(filledCount) {
   return Math.round((filledCount / 81) * 100);
 }
 
+function AnimatedBackdrop({ lightMode }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className={classNames("wizard-lava-stage", lightMode ? "wizard-lava-stage-light" : "wizard-lava-stage-dark")}>
+        <div className="wizard-lava-blob wizard-lava-blob-one" />
+        <div className="wizard-lava-blob wizard-lava-blob-two" />
+        <div className="wizard-lava-blob wizard-lava-blob-three" />
+        <div className="wizard-lava-blob wizard-lava-blob-four" />
+        <div className="wizard-lava-blob wizard-lava-blob-five" />
+        <div className="wizard-lava-wave wizard-lava-wave-one" />
+        <div className="wizard-lava-wave wizard-lava-wave-two" />
+        <div className="wizard-lava-sheen" />
+      </div>
+    </div>
+  );
+}
+
 function WizardFailDialog({ open, lightMode, onReview, onNewPuzzle }) {
   return (
     <AnimatePresence>
@@ -2590,24 +2587,27 @@ function WizardFailDialog({ open, lightMode, onReview, onNewPuzzle }) {
   );
 }
 
-function AccountDataLoader({ title, detail, actionLabel, onAction }) {
+function AccountDataLoader({ lightMode = false, title, detail, actionLabel, onAction }) {
+  const shellStyle = createSceneStyle(lightMode);
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#3a1245_0%,#17081f_45%,#050507_100%)] px-4 py-8 text-[#f6efff]">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-3xl items-center justify-center">
-        <div className="w-full rounded-[2.4rem] border border-white/10 bg-[#0f0b16]/88 p-8 text-center shadow-[0_24px_90px_rgba(0,0,0,0.42)] backdrop-blur-xl">
-          <div className="mx-auto inline-flex rounded-[1.8rem] border border-white/10 bg-black/25 p-3">
+    <div style={shellStyle} className="relative min-h-screen overflow-hidden px-4 py-8 transition-colors duration-500">
+      <AnimatedBackdrop lightMode={lightMode} />
+      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-3xl items-center justify-center">
+        <div className={classNames("w-full rounded-[2.4rem] border p-8 text-center shadow-[0_24px_90px_rgba(0,0,0,0.42)] backdrop-blur-xl", lightMode ? "border-[var(--sw-border)] bg-[rgba(255,253,255,0.74)]" : "border-white/10 bg-[#0f0b16]/88")}>
+          <div className={classNames("mx-auto inline-flex rounded-[1.8rem] border p-3", lightMode ? "border-[var(--sw-border)] bg-white/55" : "border-white/10 bg-black/25")}>
             <img src={wizardLogo} alt="Sudoku Wizard logo" className="h-24 w-auto" />
           </div>
-          <div className="mx-auto mt-7 flex h-14 w-14 items-center justify-center rounded-full border border-[#f08be8]/20 bg-[#f08be8]/10">
+          <div className={classNames("mx-auto mt-7 flex h-14 w-14 items-center justify-center rounded-full border bg-[#f08be8]/10", lightMode ? "border-[#d28ce7]/28" : "border-[#f08be8]/20")}>
             <LoaderCircle className="h-7 w-7 animate-spin text-[#f3a3eb]" />
           </div>
-          <h1 className="mt-6 text-4xl tracking-tight text-[#fbf5ff] [font-family:var(--font-display)]">{title}</h1>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-[#d9cce8]">{detail}</p>
+          <h1 className="mt-6 text-4xl tracking-tight text-[var(--sw-title)] [font-family:var(--font-display)]">{title}</h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-[var(--sw-muted)]">{detail}</p>
           {actionLabel && (
             <button
               type="button"
               onClick={onAction}
-              className="mt-6 rounded-full border border-[#f08be8]/35 bg-[#f08be8]/14 px-5 py-3 text-sm font-semibold text-[#fbf5ff] hover:bg-[#f08be8]/22"
+              className={classNames("mt-6 rounded-full border px-5 py-3 text-sm font-semibold transition-all duration-200", lightMode ? "border-[#cf8fe0]/42 bg-[#f08be8]/14 text-[#3b2049] hover:bg-[#f08be8]/24" : "border-[#f08be8]/35 bg-[#f08be8]/14 text-[#fbf5ff] hover:bg-[#f08be8]/22")}
             >
               {actionLabel}
             </button>
@@ -2618,7 +2618,7 @@ function AccountDataLoader({ title, detail, actionLabel, onAction }) {
   );
 }
 
-function AccountGate({ loading = false, message = "", onSignIn, onSignUp, onResetPassword, onGuest }) {
+function AccountGate({ lightMode = false, loading = false, message = "", onSignIn, onSignUp, onResetPassword, onGuest }) {
   const [mode, setMode] = useState("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -2628,6 +2628,7 @@ function AccountGate({ loading = false, message = "", onSignIn, onSignUp, onRese
 
   const isSignup = mode === "signup";
   const isReset = mode === "reset";
+  const shellStyle = createSceneStyle(lightMode);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -2658,28 +2659,29 @@ function AccountGate({ loading = false, message = "", onSignIn, onSignUp, onRese
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#3a1245_0%,#17081f_45%,#050507_100%)] px-4 py-8 text-[#f6efff]">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center justify-center">
+    <div style={shellStyle} className="relative min-h-screen overflow-hidden px-4 py-8 transition-colors duration-500">
+      <AnimatedBackdrop lightMode={lightMode} />
+      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center justify-center">
         <div className="grid w-full items-center gap-8 lg:grid-cols-[minmax(0,0.95fr)_440px]">
-          <div className="rounded-[2.4rem] border border-white/8 bg-[#0f0b16]/82 p-8 shadow-[0_24px_90px_rgba(0,0,0,0.36)] backdrop-blur-xl">
-            <div className="inline-flex rounded-[1.8rem] border border-white/10 bg-black/25 p-3">
+          <div className={classNames("rounded-[2.4rem] border p-8 shadow-[0_24px_90px_rgba(0,0,0,0.36)] backdrop-blur-xl", lightMode ? "border-[var(--sw-border)] bg-[rgba(255,253,255,0.72)]" : "border-white/8 bg-[#0f0b16]/82")}>
+            <div className={classNames("inline-flex rounded-[1.8rem] border p-3", lightMode ? "border-[var(--sw-border)] bg-white/55" : "border-white/10 bg-black/25")}>
               <img src={wizardLogo} alt="Sudoku Wizard logo" className="h-24 w-auto" />
             </div>
-            <h1 className="mt-6 text-5xl tracking-tight text-[#fbf5ff] [font-family:var(--font-display)]">
+            <h1 className="mt-6 text-5xl tracking-tight text-[var(--sw-title)] [font-family:var(--font-display)]">
               Sudoku Wizard
             </h1>
-            <p className="mt-4 max-w-xl text-lg leading-8 text-[#d9cce8]">
+            <p className="mt-4 max-w-xl text-lg leading-8 text-[var(--sw-muted)]">
               Play as a guest, or sign in to save best times, completed boards, and archived puzzles.
             </p>
           </div>
 
           <form
             onSubmit={handleSubmit}
-            className="rounded-[2.2rem] border border-white/8 bg-[#0f0b16]/90 p-6 shadow-[0_24px_90px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+            className={classNames("rounded-[2.2rem] border p-6 shadow-[0_24px_90px_rgba(0,0,0,0.4)] backdrop-blur-xl", lightMode ? "border-[var(--sw-border)] bg-[rgba(255,253,255,0.78)]" : "border-white/8 bg-[#0f0b16]/90")}
           >
             <div className="flex items-center gap-3">
               {loading ? <LoaderCircle className="h-6 w-6 animate-spin text-[#f3a3eb]" /> : <ShieldCheck className="h-6 w-6 text-[#f3a3eb]" />}
-              <h2 className="text-3xl text-[#fbf5ff] [font-family:var(--font-display)]">
+              <h2 className="text-3xl text-[var(--sw-title)] [font-family:var(--font-display)]">
                 {loading ? "Loading" : isReset ? "Reset Password" : isSignup ? "Sign Up" : "Sign In"}
               </h2>
             </div>
