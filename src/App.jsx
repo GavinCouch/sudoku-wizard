@@ -2359,8 +2359,11 @@ export default function SudokuWizard() {
                     </div>
                   </div>
                 )}
-                <div className="mx-auto aspect-square w-full max-w-[720px] overflow-hidden rounded-[1.25rem] border border-[var(--sw-board-frame)] bg-[var(--sw-board-frame)] shadow-[0_24px_50px_rgba(8,10,12,0.24)]">
-                  <div className="grid h-full grid-cols-9 grid-rows-9 overflow-hidden bg-[var(--sw-board-frame)]">
+                <div
+                  className="mx-auto aspect-square w-full max-w-[720px] overflow-hidden rounded-[1.25rem] border shadow-[0_24px_50px_rgba(8,10,12,0.24)]"
+                  style={{ borderColor: boardColors.border, backgroundColor: boardColors.open }}
+                >
+                  <div className="grid h-full grid-cols-9 grid-rows-9 overflow-hidden" style={{ backgroundColor: boardColors.open }}>
                     {board.map((row, r) =>
                       row.map((value, c) => {
                         const fixed = puzzleData.fixed[r][c];
@@ -2426,6 +2429,10 @@ export default function SudokuWizard() {
                           borderLeftWidth: c % 3 === 0 ? 3 : 1,
                           borderRightWidth: c === 8 ? 3 : 0,
                           borderBottomWidth: r === 8 ? 3 : 0,
+                          borderTopLeftRadius: r === 0 && c === 0 ? "1.15rem" : 0,
+                          borderTopRightRadius: r === 0 && c === 8 ? "1.15rem" : 0,
+                          borderBottomLeftRadius: r === 8 && c === 0 ? "1.15rem" : 0,
+                          borderBottomRightRadius: r === 8 && c === 8 ? "1.15rem" : 0,
                           backgroundColor,
                           color: textColor,
                           boxShadow: shadowLayers.join(", "),
