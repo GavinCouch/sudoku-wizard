@@ -2026,7 +2026,7 @@ export default function SudokuWizard() {
   return (
     <div
       style={pageStyle}
-      className="min-h-screen overflow-hidden transition-colors duration-500"
+      className="relative min-h-screen overflow-hidden transition-colors duration-500"
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {isWizardMode ? (
