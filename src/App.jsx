@@ -1189,6 +1189,18 @@ function createSceneStyle(lightMode) {
   };
 }
 
+function scheduleIdleWork(callback, fallbackDelay = 240) {
+  if (typeof window === "undefined") return () => {};
+
+  if ("requestIdleCallback" in window) {
+    const id = window.requestIdleCallback(() => callback(), { timeout: Math.max(600, fallbackDelay * 4) });
+    return () => window.cancelIdleCallback(id);
+  }
+
+  const id = window.setTimeout(callback, fallbackDelay);
+  return () => window.clearTimeout(id);
+}
+
 function readRoute() {
   if (typeof window === "undefined") return "game";
   return window.location.hash === "#/account" ? "account" : "game";
@@ -1211,6 +1223,11 @@ export default function SudokuWizard() {
   const [gamesCompleted, setGamesCompleted] = useState(0);
   const [archives, setArchives] = useState([]);
   const [puzzleData, setPuzzleData] = useState(() => generatePuzzle("Easy"));
+  const puzzleCacheRef = useRef({ Easy: puzzleData });
+  const puzzleWarmupRef = useRef({});
+  const puzzleWarmupCleanupRef = useRef([]);
+  const pendingPuzzleTimerRef = useRef(null);
+  const puzzleRequestRef = useRef(0);
   const [seconds, setSeconds] = useState(0);
   const [selected, setSelected] = useState({ r: null, c: null });
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -1225,6 +1242,7 @@ export default function SudokuWizard() {
   const [board, setBoard] = useState(puzzleData.puzzle);
   const [notes, setNotes] = useState(createEmptyNotes);
   const [wizardFailOpen, setWizardFailOpen] = useState(false);
+  const [boardLoading, setBoardLoading] = useState(false);
   const lofiAudioRef = useRef(null);
   const [lofiStatus, setLofiStatus] = useState("Off");
   const [lofiStreamIndex, setLofiStreamIndex] = useState(0);
@@ -1240,9 +1258,10 @@ export default function SudokuWizard() {
   const showMistakeRules = settings.liveValidation || isWizardMode;
   const wizardFailed = isWizardMode && mistakeCount >= WIZARD_MISTAKE_LIMIT;
   const boardLocked = completed || wizardFailed;
+  const interactionLocked = boardLocked || boardLoading;
   const activeAvatar = AVATARS.find((avatar) => avatar.id === profile.avatarId) ?? AVATARS[0];
   const ActiveAvatarIcon = activeAvatar.icon;
-  const timerIsRunning = settings.timerEnabled && !timerLocked && !boardLocked;
+  const timerIsRunning = settings.timerEnabled && !timerLocked && !boardLocked && !boardLoading;
   const boardColors = settings.lightMode ? LIGHT_BOARD_COLORS : DARK_BOARD_COLORS;
   const lofiVolume = normalizeLofiVolume(settings.lofiVolume);
   const currentLofiStream = LOFI_STREAMS[lofiStreamIndex] ?? LOFI_STREAMS[0];
@@ -1466,6 +1485,33 @@ export default function SudokuWizard() {
     }
   }, [lofiVolume, settings.lofiEnabled]);
 
+  useEffect(() => {
+    const levels = Object.keys(DIFFICULTIES).filter((level) => level !== "Easy");
+
+    for (const [index, level] of levels.entries()) {
+      const cancel = scheduleIdleWork(
+        () => {
+          if (puzzleCacheRef.current[level] || puzzleWarmupRef.current[level]) return;
+          puzzleWarmupRef.current[level] = true;
+          try {
+            puzzleCacheRef.current[level] = generatePuzzle(level);
+          } finally {
+            delete puzzleWarmupRef.current[level];
+          }
+        },
+        level === "Wizard" ? 1200 + index * 180 : 260 + index * 180
+      );
+
+      puzzleWarmupCleanupRef.current.push(cancel);
+    }
+
+    return () => {
+      if (pendingPuzzleTimerRef.current) window.clearTimeout(pendingPuzzleTimerRef.current);
+      for (const cancel of puzzleWarmupCleanupRef.current) cancel();
+      puzzleWarmupCleanupRef.current = [];
+    };
+  }, []);
+
   const selectedValue = selected.r !== null && selected.c !== null ? board[selected.r][selected.c] : null;
   const hintLimit = DIFFICULTIES[difficulty].hints;
   const hintsRemaining = Math.max(0, hintLimit - hintCount);
@@ -1688,7 +1734,7 @@ export default function SudokuWizard() {
   }
 
   async function archiveCurrentPuzzle() {
-    if (!isSignedIn || boardLocked || archiveSaving) return;
+    if (!isSignedIn || interactionLocked || archiveSaving) return;
     if (isWizardMode) {
       setAccountMessage("Wizard boards cannot be archived.");
       return;
@@ -1822,7 +1868,7 @@ export default function SudokuWizard() {
 
   function setCellValue(num) {
     const { r, c } = selected;
-    if (r === null || c === null || boardLocked) return;
+    if (r === null || c === null || interactionLocked) return;
     if (puzzleData.fixed[r][c]) return;
     if (num === board[r][c]) return;
     const correctPlacement = num !== 0 && num === puzzleData.solution[r][c];
@@ -1859,7 +1905,7 @@ export default function SudokuWizard() {
 
   function clearSelectedCell() {
     const { r, c } = selected;
-    if (r === null || c === null || puzzleData.fixed[r][c] || boardLocked) return;
+    if (r === null || c === null || puzzleData.fixed[r][c] || interactionLocked) return;
 
     setBoard((current) => {
       const next = copyBoard(current);
@@ -1875,7 +1921,7 @@ export default function SudokuWizard() {
   }
 
   function applyHint() {
-    if (boardLocked || hintsRemaining <= 0) return;
+    if (interactionLocked || hintsRemaining <= 0) return;
 
     const target = findHintTarget(board, puzzleData.fixed, selected);
     if (!target) return;
@@ -1899,11 +1945,25 @@ export default function SudokuWizard() {
     triggerFeedback(`${r}-${c}`, "correct");
   }
 
-  function loadFreshPuzzle(nextDifficulty = difficulty) {
-    setShowResetConfirm(false);
-    setDifficulty(nextDifficulty);
+  function queuePuzzleWarmup(level, delay = level === "Wizard" ? 900 : 180) {
+    if (puzzleCacheRef.current[level] || puzzleWarmupRef.current[level]) return;
 
-    const nextPuzzle = generatePuzzle(nextDifficulty);
+    const cancel = scheduleIdleWork(() => {
+      if (puzzleCacheRef.current[level] || puzzleWarmupRef.current[level]) return;
+      puzzleWarmupRef.current[level] = true;
+
+      try {
+        puzzleCacheRef.current[level] = generatePuzzle(level);
+      } finally {
+        delete puzzleWarmupRef.current[level];
+      }
+    }, delay);
+
+    puzzleWarmupCleanupRef.current.push(cancel);
+  }
+
+  function applyFreshPuzzle(nextPuzzle, nextDifficulty) {
+    setDifficulty(nextDifficulty);
     setPuzzleData(nextPuzzle);
     setBoard(nextPuzzle.puzzle);
     setNotes(createEmptyNotes());
@@ -1917,6 +1977,42 @@ export default function SudokuWizard() {
     setArchivedPuzzleId(null);
     setCompletionRecorded(false);
     setWizardFailOpen(false);
+    setBoardLoading(false);
+    queuePuzzleWarmup(nextDifficulty);
+  }
+
+  function loadFreshPuzzle(nextDifficulty = difficulty) {
+    setShowResetConfirm(false);
+    setDifficulty(nextDifficulty);
+    setWizardFailOpen(false);
+
+    puzzleRequestRef.current += 1;
+    const requestId = puzzleRequestRef.current;
+
+    if (pendingPuzzleTimerRef.current) {
+      window.clearTimeout(pendingPuzzleTimerRef.current);
+      pendingPuzzleTimerRef.current = null;
+    }
+
+    const cachedPuzzle = puzzleCacheRef.current[nextDifficulty];
+    if (cachedPuzzle) {
+      delete puzzleCacheRef.current[nextDifficulty];
+      applyFreshPuzzle(cachedPuzzle, nextDifficulty);
+      return;
+    }
+
+    setBoardLoading(true);
+    pendingPuzzleTimerRef.current = window.setTimeout(() => {
+      const nextPuzzle = generatePuzzle(nextDifficulty);
+      pendingPuzzleTimerRef.current = null;
+
+      if (puzzleRequestRef.current !== requestId) {
+        puzzleCacheRef.current[nextDifficulty] = nextPuzzle;
+        return;
+      }
+
+      applyFreshPuzzle(nextPuzzle, nextDifficulty);
+    }, 16);
   }
 
   function reviewWizardBoard() {
@@ -2095,7 +2191,7 @@ export default function SudokuWizard() {
                       "relative min-w-[6.3rem] rounded-full border px-4 py-2.5 text-center transition-all duration-200 sm:min-w-[6.8rem]",
                       active
                         ? wizardButton
-                          ? "border-transparent bg-transparent text-[#fbf4ff] shadow-[0_12px_30px_rgba(188,98,255,0.24)]"
+                          ? "border-0 bg-transparent text-[#fbf4ff] shadow-[0_10px_22px_rgba(126,54,214,0.18)]"
                           : "border-[#ff93e4]/40 bg-[linear-gradient(135deg,#ff8fe1_0%,#9c62ff_100%)] text-[#1d0922] shadow-[0_12px_30px_rgba(188,98,255,0.28)]"
                         : "border-[var(--sw-border)] bg-[var(--sw-panel-soft)] text-[var(--sw-title)] hover:border-[#be86ff]/35 hover:bg-[var(--sw-panel-hover)]",
                       wizardButton && "wizard-mode-button",
@@ -2171,14 +2267,14 @@ export default function SudokuWizard() {
                   icon={<Lightbulb className="h-4 w-4" />}
                   label={hintLimit === 0 ? "Hints off" : `Hint ${hintsRemaining}`}
                   onClick={applyHint}
-                  disabled={boardLocked || hintsRemaining <= 0}
+                  disabled={interactionLocked || hintsRemaining <= 0}
                 />
                 <UtilityButton
                   icon={<Eraser className="h-4 w-4" />}
                   label="Clear"
                   onClick={clearSelectedCell}
                   disabled={
-                    boardLocked ||
+                    interactionLocked ||
                     selected.r === null ||
                     selected.c === null ||
                     puzzleData.fixed[selected.r][selected.c]
@@ -2189,7 +2285,7 @@ export default function SudokuWizard() {
                     icon={<Archive className="h-4 w-4" />}
                     label={archiveSaving ? "Saving..." : archivedPuzzleId ? "Update archive" : `Archive ${archives.length}/${MAX_ARCHIVES}`}
                     onClick={archiveCurrentPuzzle}
-                    disabled={archiveSaving || boardLocked || (!archivedPuzzleId && archives.length >= MAX_ARCHIVES)}
+                    disabled={archiveSaving || interactionLocked || (!archivedPuzzleId && archives.length >= MAX_ARCHIVES)}
                   />
                 )}
                 {!showResetConfirm && (
@@ -2255,7 +2351,15 @@ export default function SudokuWizard() {
                 </div>
               )}
 
-              <div className="min-w-0 overflow-hidden rounded-[2rem] border border-[var(--sw-border)] bg-[var(--sw-board-card)] p-3 shadow-[var(--sw-shadow-tight)] sm:p-4">
+              <div className="relative min-w-0 overflow-hidden rounded-[2rem] border border-[var(--sw-border)] bg-[var(--sw-board-card)] p-3 shadow-[var(--sw-shadow-tight)] sm:p-4">
+                {boardLoading && (
+                  <div className="absolute inset-3 z-20 flex items-center justify-center rounded-[1.35rem] border border-[var(--sw-border-soft)] bg-[rgba(10,6,16,0.34)] backdrop-blur-md">
+                    <div className="rounded-[1.6rem] border border-[var(--sw-border-soft)] bg-[var(--sw-panel)] px-5 py-4 text-center shadow-[var(--sw-shadow-tight)]">
+                      <div className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-[var(--sw-muted-strong)]">Conjuring</div>
+                      <div className="mt-2 text-xl text-[var(--sw-title)] [font-family:var(--font-display)]">{difficulty}</div>
+                    </div>
+                  </div>
+                )}
                 <div className="mx-auto aspect-square w-full max-w-[720px] overflow-hidden rounded-[1.25rem] border border-[var(--sw-board-frame)] bg-[var(--sw-board-frame)] shadow-[0_24px_50px_rgba(8,10,12,0.24)]">
                   <div className="grid h-full grid-cols-9 grid-rows-9 overflow-hidden bg-[var(--sw-board-frame)]">
                     {board.map((row, r) =>

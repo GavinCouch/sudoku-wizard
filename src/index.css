@@ -63,6 +63,18 @@ button {
   }
 }
 
+@keyframes wizard-button-liquid-flow {
+  0% {
+    background-position: 0% 40%;
+  }
+  50% {
+    background-position: 100% 60%;
+  }
+  100% {
+    background-position: 0% 40%;
+  }
+}
+
 @keyframes wizard-lava-drift {
   0% {
     transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
@@ -237,7 +249,9 @@ button {
   border-radius: inherit;
   overflow: hidden;
   background:
-    linear-gradient(135deg, rgba(255, 167, 244, 0.88) 0%, rgba(188, 108, 255, 0.94) 48%, rgba(255, 146, 221, 0.9) 100%);
+    linear-gradient(128deg, #ff97ea 0%, #bc6cff 32%, #8f67ff 52%, #ff7fd0 78%, #ffacef 100%);
+  background-size: 200% 200%;
+  animation: wizard-button-liquid-flow 1.15s linear infinite;
   z-index: 0;
 }
 
@@ -260,21 +274,22 @@ button {
       rgba(255, 109, 210, 0.8) 302deg,
       rgba(255, 255, 255, 0) 360deg
     );
-  filter: blur(7px) saturate(1.32);
-  opacity: 0.96;
-  animation: wizard-button-swirl-spin 0.56s linear infinite;
+  filter: blur(6px) saturate(1.36);
+  opacity: 0.98;
+  mix-blend-mode: screen;
+  animation: wizard-button-swirl-spin 0.48s linear infinite;
 }
 
 .wizard-mode-button-fill::after {
   content: "";
   position: absolute;
-  inset: -16%;
+  inset: -20%;
   background:
-    radial-gradient(circle at 24% 28%, rgba(255, 255, 255, 0.34) 0%, transparent 24%),
-    radial-gradient(circle at 74% 70%, rgba(79, 22, 126, 0.26) 0%, transparent 34%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.01) 44%, rgba(255, 255, 255, 0.18));
-  mix-blend-mode: soft-light;
-  animation: wizard-button-swirl-drift 0.68s ease-in-out infinite;
+    radial-gradient(circle at 20% 26%, rgba(255, 255, 255, 0.44) 0%, transparent 22%),
+    radial-gradient(circle at 78% 64%, rgba(116, 35, 181, 0.34) 0%, transparent 28%),
+    radial-gradient(circle at 54% 50%, rgba(255, 139, 226, 0.34) 0%, transparent 34%);
+  mix-blend-mode: overlay;
+  animation: wizard-button-swirl-drift 0.58s ease-in-out infinite;
 }
 
 .wizard-mode-button > * {
@@ -283,7 +298,7 @@ button {
 }
 
 .wizard-mode-button-active {
-  box-shadow: 0 0 22px rgba(255, 143, 225, 0.18), 0 0 34px rgba(156, 98, 255, 0.18);
+  box-shadow: 0 10px 22px rgba(126, 54, 214, 0.18);
 }
 
 .wizard-lava-wave {
