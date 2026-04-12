@@ -37,25 +37,25 @@ button {
 
 @keyframes wizard-button-swirl-spin {
   0% {
-    transform: translate3d(-8%, -8%, 0) rotate(0deg) scale(1.2);
+    transform: translate(-50%, -50%) rotate(0deg) scale(1.18);
   }
   100% {
-    transform: translate3d(-8%, -8%, 0) rotate(360deg) scale(1.2);
+    transform: translate(-50%, -50%) rotate(360deg) scale(1.18);
   }
 }
 
 @keyframes wizard-button-swirl-drift {
   0% {
-    transform: translate3d(-7%, 8%, 0) scale(1.04) rotate(-3deg);
-    opacity: 0.5;
+    transform: translate3d(-6%, 7%, 0) scale(1.02) rotate(-4deg);
+    opacity: 0.48;
   }
   50% {
-    transform: translate3d(8%, -10%, 0) scale(1.16) rotate(5deg);
-    opacity: 0.8;
+    transform: translate3d(7%, -9%, 0) scale(1.12) rotate(6deg);
+    opacity: 0.74;
   }
   100% {
-    transform: translate3d(-3%, 10%, 0) scale(0.98) rotate(-4deg);
-    opacity: 0.56;
+    transform: translate3d(-3%, 9%, 0) scale(0.98) rotate(-3deg);
+    opacity: 0.54;
   }
 }
 
@@ -225,44 +225,50 @@ button {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  --wizard-button-spin-duration: 1.2s;
-  --wizard-button-drift-duration: 1.65s;
-  box-shadow: 0 0 18px rgba(255, 143, 225, 0.18), 0 0 28px rgba(156, 98, 255, 0.14);
 }
 
-.wizard-mode-button::before {
+.wizard-mode-button-fill {
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(255, 167, 244, 0.18), rgba(156, 98, 255, 0.16));
+  z-index: 0;
+}
+
+.wizard-mode-button-fill::before {
   content: "";
   position: absolute;
-  inset: -65% -28%;
-  border-radius: 44%;
+  left: 50%;
+  top: 50%;
+  width: 165%;
+  height: 300%;
+  border-radius: 42%;
+  transform: translate(-50%, -50%);
   background:
     conic-gradient(
       from 0deg,
       rgba(255, 255, 255, 0) 0deg,
-      rgba(255, 171, 238, 0.72) 58deg,
-      rgba(255, 114, 214, 0.8) 140deg,
-      rgba(122, 88, 255, 0.84) 228deg,
-      rgba(255, 108, 209, 0.76) 300deg,
+      rgba(255, 178, 240, 0.78) 62deg,
+      rgba(255, 118, 216, 0.84) 144deg,
+      rgba(128, 92, 255, 0.88) 232deg,
+      rgba(255, 109, 210, 0.8) 302deg,
       rgba(255, 255, 255, 0) 360deg
     );
-  filter: blur(11px) saturate(1.22);
-  opacity: 0.74;
-  animation: wizard-button-swirl-spin var(--wizard-button-spin-duration) linear infinite;
-  z-index: 0;
+  filter: blur(10px) saturate(1.18);
+  animation: wizard-button-swirl-spin 0.88s linear infinite;
 }
 
-.wizard-mode-button::after {
+.wizard-mode-button-fill::after {
   content: "";
   position: absolute;
-  inset: 2px;
-  border-radius: 9999px;
+  inset: -18%;
   background:
     radial-gradient(circle at 24% 28%, rgba(255, 255, 255, 0.22) 0%, transparent 24%),
     radial-gradient(circle at 74% 70%, rgba(94, 36, 141, 0.18) 0%, transparent 32%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.01) 44%, rgba(255, 255, 255, 0.12));
   mix-blend-mode: soft-light;
-  animation: wizard-button-swirl-drift var(--wizard-button-drift-duration) ease-in-out infinite;
-  z-index: 0;
+  animation: wizard-button-swirl-drift 1.14s ease-in-out infinite;
 }
 
 .wizard-mode-button > * {
@@ -271,8 +277,6 @@ button {
 }
 
 .wizard-mode-button-active {
-  --wizard-button-spin-duration: 0.82s;
-  --wizard-button-drift-duration: 1.12s;
   box-shadow: 0 0 22px rgba(255, 143, 225, 0.26), 0 0 36px rgba(156, 98, 255, 0.24);
 }
 

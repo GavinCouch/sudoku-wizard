@@ -2102,7 +2102,7 @@ export default function SudokuWizard() {
               </div>
 
               <div className="flex flex-wrap gap-2 xl:justify-end">
-                {Object.entries(DIFFICULTIES).map(([level, info]) => {
+                {Object.keys(DIFFICULTIES).map((level) => {
                   const wizardButton = level === "Wizard";
                   const active = difficulty === level;
 
@@ -2112,18 +2112,25 @@ export default function SudokuWizard() {
                     type="button"
                     onClick={() => loadFreshPuzzle(level)}
                     className={classNames(
-                      "rounded-full border px-4 py-2.5 text-left transition-all duration-200",
+                      "relative min-w-[8.25rem] rounded-full border px-6 py-4 text-center transition-all duration-200 sm:min-w-[9rem]",
                       active
-                        ? "border-[#ff93e4]/40 bg-[linear-gradient(135deg,#ff8fe1_0%,#9c62ff_100%)] text-[#1d0922] shadow-[0_12px_30px_rgba(188,98,255,0.28)]"
-                        : "border-[var(--sw-border)] bg-[var(--sw-panel-soft)] text-[var(--sw-text)] hover:border-[#be86ff]/35 hover:bg-[var(--sw-panel-hover)]",
+                        ? wizardButton
+                          ? "border-[#ff93e4]/42 bg-[rgba(255,255,255,0.08)] text-[var(--sw-title)] shadow-[0_12px_30px_rgba(188,98,255,0.22)]"
+                          : "border-[#ff93e4]/40 bg-[linear-gradient(135deg,#ff8fe1_0%,#9c62ff_100%)] text-[#1d0922] shadow-[0_12px_30px_rgba(188,98,255,0.28)]"
+                        : "border-[var(--sw-border)] bg-[var(--sw-panel-soft)] text-[var(--sw-title)] hover:border-[#be86ff]/35 hover:bg-[var(--sw-panel-hover)]",
                       wizardButton && "wizard-mode-button",
                       wizardButton && active && "wizard-mode-button-active"
                     )}
                   >
-                    <div className="text-sm font-semibold">{level}</div>
-                    <div className={classNames("text-xs", active ? "text-[#3c1644]" : "text-[var(--sw-muted)]")}>
-                      {wizardButton ? "Arcane trial" : `${info.clues} clues`}
-                    </div>
+                    {wizardButton && active && <span aria-hidden="true" className="wizard-mode-button-fill" />}
+                    <span
+                      className={classNames(
+                        "relative z-10 block text-lg font-semibold leading-none sm:text-[1.45rem]",
+                        active && !wizardButton ? "text-[#1d0922]" : "text-current"
+                      )}
+                    >
+                      {level}
+                    </span>
                   </button>
                   );
                 })}
