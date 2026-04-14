@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -6,8 +7,8 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --font-ui: "Avenir Next", "Segoe UI", sans-serif;
-  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --font-ui: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
 }
 
 html {
@@ -19,6 +20,9 @@ body {
   min-width: 320px;
   min-height: 100vh;
   font-family: var(--font-ui);
+  font-optical-sizing: auto;
+  letter-spacing: -0.015em;
+  line-height: 1.45;
   background: #050507;
 }
 
@@ -33,4 +37,346 @@ button {
 ::selection {
   background: rgb(240 139 232 / 35%);
   color: #fff5ff;
+}
+
+@keyframes wizard-button-swirl-spin {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg) scale(1.18);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg) scale(1.18);
+  }
+}
+
+@keyframes wizard-button-swirl-drift {
+  0% {
+    transform: translate3d(-6%, 7%, 0) scale(1.02) rotate(-4deg);
+    opacity: 0.48;
+  }
+  50% {
+    transform: translate3d(7%, -9%, 0) scale(1.12) rotate(6deg);
+    opacity: 0.74;
+  }
+  100% {
+    transform: translate3d(-3%, 9%, 0) scale(0.98) rotate(-3deg);
+    opacity: 0.54;
+  }
+}
+
+@keyframes wizard-button-liquid-flow {
+  0% {
+    background-position: 0% 40%;
+  }
+  50% {
+    background-position: 100% 60%;
+  }
+  100% {
+    background-position: 0% 40%;
+  }
+}
+
+@keyframes wizard-lava-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  25% {
+    transform: translate3d(5%, -7%, 0) scale(1.08) rotate(6deg);
+  }
+  50% {
+    transform: translate3d(-4%, 6%, 0) scale(0.94) rotate(-5deg);
+  }
+  75% {
+    transform: translate3d(7%, 4%, 0) scale(1.1) rotate(8deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes wizard-lava-breathe {
+  0% {
+    border-radius: 44% 56% 52% 48% / 41% 37% 63% 59%;
+    filter: blur(34px);
+  }
+  50% {
+    border-radius: 57% 43% 46% 54% / 52% 60% 40% 48%;
+    filter: blur(42px);
+  }
+  100% {
+    border-radius: 44% 56% 52% 48% / 41% 37% 63% 59%;
+    filter: blur(34px);
+  }
+}
+
+@keyframes wizard-lava-wave {
+  0% {
+    transform: translate3d(-4%, 5%, 0) rotate(-3deg) scale(1);
+    opacity: 0.42;
+  }
+  50% {
+    transform: translate3d(6%, -6%, 0) rotate(4deg) scale(1.08);
+    opacity: 0.68;
+  }
+  100% {
+    transform: translate3d(-4%, 5%, 0) rotate(-3deg) scale(1);
+    opacity: 0.42;
+  }
+}
+
+@keyframes wizard-lava-sheen {
+  0% {
+    transform: translate3d(-2%, 0, 0) scale(1);
+    opacity: 0.28;
+  }
+  50% {
+    transform: translate3d(2%, 2%, 0) scale(1.05);
+    opacity: 0.48;
+  }
+  100% {
+    transform: translate3d(-2%, 0, 0) scale(1);
+    opacity: 0.28;
+  }
+}
+
+@keyframes wizard-lava-stage-float {
+  0% {
+    transform: translate3d(-3%, -2%, 0) scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translate3d(4%, 3%, 0) scale(1.08);
+    opacity: 0.48;
+  }
+  100% {
+    transform: translate3d(-3%, -2%, 0) scale(1);
+    opacity: 0.3;
+  }
+}
+
+.wizard-lava-stage {
+  position: absolute;
+  inset: -10%;
+  overflow: hidden;
+  isolation: isolate;
+  opacity: 0.98;
+}
+
+.wizard-lava-stage::before,
+.wizard-lava-stage::after {
+  content: "";
+  position: absolute;
+  inset: -8%;
+  border-radius: 50%;
+  filter: blur(78px);
+  pointer-events: none;
+  animation: wizard-lava-stage-float 9.5s ease-in-out infinite;
+}
+
+.wizard-lava-stage::after {
+  animation-duration: 12.5s;
+  animation-delay: -4.2s;
+}
+
+.wizard-lava-stage-light {
+  --wizard-pink: rgba(255, 134, 220, 0.44);
+  --wizard-purple: rgba(150, 110, 255, 0.34);
+  --wizard-rose: rgba(255, 208, 240, 0.52);
+  --wizard-shadow: rgba(115, 74, 140, 0.12);
+  --wizard-sheen: rgba(255, 255, 255, 0.56);
+  --wizard-wave: rgba(255, 188, 235, 0.32);
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 188, 238, 0.24) 0%, transparent 38%),
+    radial-gradient(circle at 83% 18%, rgba(168, 126, 255, 0.18) 0%, transparent 34%),
+    radial-gradient(circle at 54% 82%, rgba(255, 255, 255, 0.36) 0%, transparent 38%);
+}
+
+.wizard-lava-stage-light::before {
+  background: radial-gradient(circle at 28% 26%, rgba(255, 174, 236, 0.26) 0%, transparent 44%);
+}
+
+.wizard-lava-stage-light::after {
+  background: radial-gradient(circle at 72% 66%, rgba(169, 130, 255, 0.18) 0%, transparent 42%);
+}
+
+.wizard-lava-stage-dark {
+  --wizard-pink: rgba(255, 95, 204, 0.34);
+  --wizard-purple: rgba(114, 84, 255, 0.28);
+  --wizard-rose: rgba(255, 171, 232, 0.2);
+  --wizard-shadow: rgba(0, 0, 0, 0.3);
+  --wizard-sheen: rgba(255, 206, 242, 0.18);
+  --wizard-wave: rgba(182, 105, 255, 0.22);
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 111, 215, 0.16) 0%, transparent 38%),
+    radial-gradient(circle at 83% 18%, rgba(114, 84, 255, 0.14) 0%, transparent 34%),
+    radial-gradient(circle at 54% 82%, rgba(255, 175, 233, 0.1) 0%, transparent 38%);
+}
+
+.wizard-lava-stage-dark::before {
+  background: radial-gradient(circle at 30% 22%, rgba(255, 108, 211, 0.16) 0%, transparent 44%);
+}
+
+.wizard-lava-stage-dark::after {
+  background: radial-gradient(circle at 70% 68%, rgba(118, 89, 255, 0.14) 0%, transparent 42%);
+}
+
+.wizard-lava-blob {
+  position: absolute;
+  border-radius: 44% 56% 52% 48% / 41% 37% 63% 59%;
+  background:
+    radial-gradient(circle at 30% 28%, var(--wizard-rose) 0%, var(--wizard-pink) 32%, var(--wizard-purple) 64%, transparent 78%);
+  opacity: 0.9;
+  mix-blend-mode: screen;
+  animation:
+    wizard-lava-drift var(--drift-duration) ease-in-out infinite,
+    wizard-lava-breathe var(--breathe-duration) ease-in-out infinite;
+}
+
+.wizard-lava-stage-light .wizard-lava-blob {
+  mix-blend-mode: multiply;
+}
+
+.wizard-lava-blob-one {
+  top: -2rem;
+  left: 6%;
+  width: 24rem;
+  height: 22rem;
+  --drift-duration: 13.5s;
+  --breathe-duration: 7.2s;
+}
+
+.wizard-lava-blob-two {
+  top: 14%;
+  right: -3rem;
+  width: 28rem;
+  height: 25rem;
+  --drift-duration: 15.5s;
+  --breathe-duration: 7.8s;
+  animation-delay: -4s, -2s;
+}
+
+.wizard-lava-blob-three {
+  bottom: 2%;
+  left: 18%;
+  width: 26rem;
+  height: 24rem;
+  --drift-duration: 14.5s;
+  --breathe-duration: 6.8s;
+  animation-delay: -8s, -3s;
+}
+
+.wizard-lava-blob-four {
+  bottom: -4rem;
+  right: 12%;
+  width: 30rem;
+  height: 27rem;
+  --drift-duration: 16.8s;
+  --breathe-duration: 8.3s;
+  animation-delay: -6s, -5s;
+}
+
+.wizard-lava-blob-five {
+  top: 38%;
+  left: 42%;
+  width: 18rem;
+  height: 18rem;
+  --drift-duration: 11.5s;
+  --breathe-duration: 5.9s;
+  animation-delay: -10s, -4s;
+}
+
+.wizard-mode-button {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 9999px;
+  clip-path: inset(0 round 9999px);
+}
+
+.wizard-mode-button-active {
+  background:
+    linear-gradient(128deg, #ff97ea 0%, #bc6cff 32%, #8f67ff 52%, #ff7fd0 78%, #ffacef 100%);
+  background-size: 220% 220%;
+  animation: wizard-button-liquid-flow 0.9s linear infinite;
+  box-shadow: 0 10px 22px rgba(126, 54, 214, 0.18);
+  border-radius: inherit;
+  background-clip: padding-box;
+}
+
+.wizard-mode-button-active::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 215%;
+  height: 360%;
+  border-radius: 42%;
+  transform: translate(-50%, -50%);
+  background:
+    conic-gradient(
+      from 0deg,
+      rgba(255, 255, 255, 0) 0deg,
+      rgba(255, 178, 240, 0.78) 62deg,
+      rgba(255, 118, 216, 0.84) 144deg,
+      rgba(128, 92, 255, 0.88) 232deg,
+      rgba(255, 109, 210, 0.8) 302deg,
+      rgba(255, 255, 255, 0) 360deg
+    );
+  filter: blur(6px) saturate(1.36);
+  opacity: 0.98;
+  mix-blend-mode: screen;
+  animation: wizard-button-swirl-spin 0.48s linear infinite;
+  z-index: 0;
+  clip-path: inset(0 round 9999px);
+}
+
+.wizard-mode-button-active::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(circle at 20% 26%, rgba(255, 255, 255, 0.44) 0%, transparent 22%),
+    radial-gradient(circle at 78% 64%, rgba(116, 35, 181, 0.34) 0%, transparent 28%),
+    radial-gradient(circle at 54% 50%, rgba(255, 139, 226, 0.34) 0%, transparent 34%);
+  mix-blend-mode: overlay;
+  animation: wizard-button-swirl-drift 0.58s ease-in-out infinite;
+  z-index: 0;
+  clip-path: inset(0 round 9999px);
+}
+
+.wizard-mode-button > * {
+  position: relative;
+  z-index: 1;
+}
+
+.wizard-lava-wave {
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  border-radius: 9999px;
+  filter: blur(70px);
+  background: radial-gradient(circle at center, var(--wizard-wave) 0%, transparent 70%);
+  animation: wizard-lava-wave 11.5s ease-in-out infinite;
+}
+
+.wizard-lava-wave-one {
+  bottom: -7rem;
+  height: 18rem;
+}
+
+.wizard-lava-wave-two {
+  top: 42%;
+  height: 16rem;
+  animation-duration: 14.5s;
+  animation-delay: -7s;
+}
+
+.wizard-lava-sheen {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 22% 20%, var(--wizard-sheen) 0%, transparent 28%),
+    radial-gradient(circle at 76% 24%, rgba(255, 255, 255, 0.18) 0%, transparent 22%),
+    linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.04) 38%, transparent 72%);
+  mix-blend-mode: soft-light;
+  animation: wizard-lava-sheen 8.6s ease-in-out infinite;
 }
